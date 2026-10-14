@@ -1,0 +1,36 @@
+[project]
+name = "livepeer-video-engine-runners"
+version = "0.1.0"
+description = "Run LightX2V, SGLang Diffusion and vLLM-Omni as Livepeer live runners: text-to-video over SSE or trickle, with runtime model switching."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "Cloud SPE" }]
+keywords = ["livepeer", "video-generation", "text-to-video", "lightx2v", "sglang", "vllm-omni", "gpu"]
+dependencies = [
+    "livepeer-gateway==1.0.0",
+    "aiohttp>=3.9",
+    # The stub engine only; the GPU images install the runner without them.
+    "av>=11",
+    "numpy>=1.26",
+]
+
+[project.urls]
+Homepage = "https://github.com/Cloud-SPE/livepeer-video-engine-runners"
+Issues = "https://github.com/Cloud-SPE/livepeer-video-engine-runners/issues"
+Changelog = "https://github.com/Cloud-SPE/livepeer-video-engine-runners/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[tool.uv]
+# Flat scripts, not an installable package.
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"

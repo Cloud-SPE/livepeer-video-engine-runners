@@ -1,0 +1,55 @@
+{
+  "default": "fastwan2.1-t2v-1.3b",
+  "models": [
+    {
+      "id": "fastwan2.1-t2v-1.3b",
+      "engine": "openai-videos",
+      "command": [
+        "sglang",
+        "serve",
+        "--model-path",
+        "FastVideo/FastWan2.1-T2V-1.3B-Diffusers",
+        "--num-gpus",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100"
+      ],
+      "port": 9100,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 61,
+        "fps": 16,
+        "steps": 3
+      }
+    },
+    {
+      "id": "wan2.1-t2v-1.3b",
+      "engine": "openai-videos",
+      "command": [
+        "sglang",
+        "serve",
+        "--model-path",
+        "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+        "--text-encoder-cpu-offload",
+        "--pin-cpu-memory",
+        "--num-gpus",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100"
+      ],
+      "port": 9100,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 81,
+        "fps": 16,
+        "steps": 30
+      }
+    }
+  ]
+}

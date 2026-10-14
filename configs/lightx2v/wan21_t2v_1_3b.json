@@ -1,0 +1,12 @@
+{
+  "infer_steps": 30,
+  "num_frames": 81,
+  "text_len": 512,
+  "size": [480, 832],
+  "self_attn_1_type": "sage_attn2",
+  "cross_attn_1_type": "sage_attn2",
+  "sample_guide_scale": 6,
+  "sample_shift": 8,
+  "enable_cfg": true,
+  "cpu_offload": false
+}

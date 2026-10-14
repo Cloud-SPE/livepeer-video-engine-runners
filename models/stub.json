@@ -1,0 +1,41 @@
+{
+  "default": "stub-wan-t2v",
+  "models": [
+    {
+      "id": "stub-wan-t2v",
+      "engine": "openai-videos",
+      "command": [
+        "python",
+        "stub_engine.py",
+        "--api",
+        "openai",
+        "--port",
+        "9100",
+        "--delay",
+        "3"
+      ],
+      "port": 9100,
+      "startup_timeout_s": 60,
+      "job_timeout_s": 120,
+      "defaults": { "width": 448, "height": 256, "num_frames": 49, "fps": 16 }
+    },
+    {
+      "id": "stub-h3",
+      "engine": "lightx2v",
+      "command": [
+        "python",
+        "stub_engine.py",
+        "--api",
+        "lightx2v",
+        "--port",
+        "9100",
+        "--delay",
+        "5"
+      ],
+      "port": 9100,
+      "startup_timeout_s": 60,
+      "job_timeout_s": 120,
+      "defaults": { "width": 448, "height": 256, "num_frames": 121 }
+    }
+  ]
+}

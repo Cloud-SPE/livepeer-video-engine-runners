@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+  # Base images. Engine images are pinned on purpose (see docker/*.Dockerfile):
+  # review each bump against a GPU run before merging.
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly

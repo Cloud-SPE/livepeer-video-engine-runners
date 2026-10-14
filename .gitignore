@@ -1,0 +1,7 @@
+.env
+.venv/
+weights/
+*.mp4
+__pycache__/
+.ruff_cache/
+.pytest_cache/

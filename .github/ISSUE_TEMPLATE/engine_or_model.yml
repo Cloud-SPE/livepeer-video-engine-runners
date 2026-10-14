@@ -1,0 +1,32 @@
+name: Engine or model request / GPU report
+description: Ask for a new engine or model, or report how one runs on your GPU.
+labels: [engines]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - New model for an existing engine
+        - New engine
+        - GPU validation report
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model (Hugging Face id or link)
+  - type: input
+    id: engine
+    attributes:
+      label: Engine and version or image tag
+  - type: input
+    id: license
+    attributes:
+      label: Model and engine licenses
+      description: Commercial use on the network needs a permissive license.
+  - type: textarea
+    id: results
+    attributes:
+      label: Results
+      description: GPU and VRAM, resolution, frames, steps, load time, seconds per clip, peak VRAM, catalog entry used.

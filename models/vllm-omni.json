@@ -1,0 +1,51 @@
+{
+  "default": "wan2.2-ti2v-5b",
+  "models": [
+    {
+      "id": "wan2.2-ti2v-5b",
+      "engine": "openai-videos",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+        "--omni",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100"
+      ],
+      "port": 9100,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 49,
+        "fps": 24,
+        "steps": 30
+      }
+    },
+    {
+      "id": "wan2.2-t2v-a14b",
+      "engine": "openai-videos",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+        "--omni",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100"
+      ],
+      "port": 9100,
+      "startup_timeout_s": 3600,
+      "job_timeout_s": 3600,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 81,
+        "fps": 16,
+        "steps": 40
+      }
+    }
+  ]
+}
