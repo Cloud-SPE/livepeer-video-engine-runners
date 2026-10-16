@@ -8,9 +8,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
-  # Base images. Engine images are pinned on purpose (see docker/*.Dockerfile):
+  # Base images. Engine images are pinned on purpose (see deploy/docker/*.Dockerfile):
   # review each bump against a GPU run before merging.
   - package-ecosystem: docker
-    directory: /docker
+    directory: /deploy/docker
     schedule:
       interval: weekly

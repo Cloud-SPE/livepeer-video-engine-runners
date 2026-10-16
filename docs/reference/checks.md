@@ -77,6 +77,12 @@ managed catalog selections. Cleanup verifies ownership and removes only recorded
 test resources, retaining receipts and manifests. These fixtures establish CPU
 contract behavior, not GPU compatibility.
 
+Managed CI provisions a pinned Docker daemon and explicitly verifies API v1.51
+before building fixtures. Its Buildx context and proxy socket refer to that same
+daemon; the hosted image's preinstalled Docker may be too old. Local managed
+checks need a compatible daemon already configured, as described in the
+[deployment prerequisites](../guides/container-deployment.md).
+
 See [validation runs](../guides/validation-runs.md) for output directories,
 receipts, cleanup recovery and concurrent worktrees. The original `tests/e2e/e2e.sh`
 still targets an explicitly selected running CPU test stack; it does not own or

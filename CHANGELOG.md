@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - Normalize mount ordering in CPU cleanup fingerprints while retaining checks for changed mount sources, permissions and propagation.
 - Print a bounded redacted CPU step log on failure even when resource inspection fails, preserving the original startup diagnostic in CI.
+- Provision a pinned API-compatible Docker daemon for managed CI, use its matching Buildx context/proxy socket, and update Dependabot to the canonical Dockerfile directory.
 
 ## [0.2.0] - 2026-10-16
 
