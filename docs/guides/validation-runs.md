@@ -72,7 +72,9 @@ outcome. None of these states authorize automatic generation resubmission.
 
 CPU `resources.json` separately records the daemon identity, per-run images and
 Docker-issued resource IDs with configuration fingerprints. It contains no
-plaintext service environment. Cleanup checks recorded identities and ownership
+plaintext service environment. Container fingerprints normalize Docker's mount
+response order while preserving every mount field; a changed source, permission
+or propagation mode still blocks cleanup. Cleanup checks recorded identities and ownership
 before removal, stops the verified runner first, and removes only owned test
 containers, networks, temporary volumes and image tags. Managed engines must also
 match the controller's durable ownership record and generated trusted policy.

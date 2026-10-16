@@ -227,3 +227,72 @@ def test_cleanup_rechecks_configuration_immediately_before_removal(tmp_path):
     with pytest.raises(RuntimeError, match="configuration drifted"):
         cleanup_manifest(path, daemon)
     assert daemon.deleted == []
+
+
+def test_capture_accepts_mounts_in_any_order(tmp_path):
+    image = "sha256:" + "c" * 64
+    container = {
+        "Id": "d" * 64,
+        "Name": f"/{RUN}-controller-1",
+        "Image": image,
+        "State": {"Running": True},
+        "Config": {
+            "Labels": {
+                LABEL: RUN,
+                "com.docker.compose.project": RUN,
+                "com.docker.compose.service": "controller",
+            }
+        },
+        "HostConfig": {},
+        "Mounts": [
+            {"Type": "volume", "Source": "/state-source", "Destination": "/state"},
+            {"Type": "volume", "Source": "/lease-source", "Destination": "/leases"},
+        ],
+        "NetworkSettings": {"Networks": {"control": {}, "engine": {}}},
+    }
+    record = resource("container", container, "controller")
+    daemon = Daemon(
+        {
+            ("container", container["Id"]): container,
+            ("image", image): {"Id": image},
+        }
+    )
+    path = manifest(tmp_path, daemon, [record])
+    data = json.loads(path.read_text())
+    data["service_images"] = {"controller": image}
+    atomic_json(path, data)
+    daemon.objects[("container", container["Id"])]["Mounts"].reverse()
+
+    assert capture(path, daemon)["resources"] == [record]
+
+
+@pytest.mark.parametrize(
+    ("field", "changed"),
+    [("Source", "/foreign"), ("RW", True), ("Propagation", "rshared")],
+)
+def test_cleanup_refuses_changed_container_mounts(tmp_path, field, changed):
+    container = {
+        "Id": "d" * 64,
+        "Name": f"/{RUN}-controller-1",
+        "Image": "sha256:" + "c" * 64,
+        "State": {"Running": False},
+        "Config": {"Labels": {LABEL: RUN}},
+        "HostConfig": {},
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/catalog",
+                "Destination": "/config/catalog.json",
+                "RW": False,
+                "Propagation": "rprivate",
+            }
+        ],
+        "NetworkSettings": {"Networks": {}},
+    }
+    daemon = Daemon({("container", container["Id"]): container})
+    path = manifest(tmp_path, daemon, [resource("container", container, "controller")])
+    container["Mounts"][0][field] = changed
+
+    with pytest.raises(RuntimeError, match="configuration drifted"):
+        cleanup_manifest(path, daemon)
+    assert daemon.deleted == []

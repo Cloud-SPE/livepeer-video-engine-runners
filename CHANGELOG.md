@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- Normalize mount ordering in CPU cleanup fingerprints while retaining checks for changed mount sources, permissions and propagation.
+
 ## [0.2.0] - 2026-10-16
 
 ### Changed

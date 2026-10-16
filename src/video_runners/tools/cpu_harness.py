@@ -50,6 +50,9 @@ def resource(kind, actual, role=""):
             key: actual[key]
             for key in ("Config", "HostConfig", "Mounts", "Image", "Name")
         }
+        # Docker inspection may reorder mounts. Preserve every mount field while
+        # comparing their configuration independently of response order.
+        value["Mounts"] = sorted(actual["Mounts"], key=fingerprint)
         value["networks"] = sorted(actual["NetworkSettings"]["Networks"])
     elif kind == "network":
         value = {
