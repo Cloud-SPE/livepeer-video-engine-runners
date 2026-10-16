@@ -146,6 +146,39 @@ def test_cpu_failure_logs_redact_known_tokens(tmp_path, monkeypatch):
     assert "sensitive-test-token" not in log and "[redacted]" in log
 
 
+def test_cpu_failure_reports_step_log_when_inspection_fails(
+    tmp_path, monkeypatch, capsys
+):
+    from video_runners.tools import cpu_harness
+
+    receipt = evidence.RunReceipt(ROOT, tmp_path, "cpu-managed")
+    harness = cpu_harness.CPUHarness.__new__(cpu_harness.CPUHarness)
+    harness.receipt, harness.path, harness.env = (
+        receipt,
+        tmp_path / "resources.json",
+        {},
+    )
+    harness.values = {"ENGINE_CONTROLLER_TOKEN": "sensitive-test-token"}
+    harness.docker = object()
+
+    def fail(args, **kwargs):
+        kwargs["stdout"].write("Docker API version unsupported: sensitive-test-token\n")
+        raise subprocess.CalledProcessError(1, args)
+
+    def unavailable(*args):
+        raise RuntimeError("inspection unavailable")
+
+    monkeypatch.setattr(cpu_harness.subprocess, "run", fail)
+    monkeypatch.setattr(cpu_harness, "capture", unavailable)
+    with pytest.raises(subprocess.CalledProcessError):
+        harness.command("startup", ["failing-step"])
+
+    diagnostic = capsys.readouterr().err
+    assert "Docker API version unsupported" in diagnostic
+    assert "[redacted]" in diagnostic
+    assert "sensitive-test-token" not in diagnostic
+
+
 def test_lifecycle_diagnostics_refuse_sensitive_fields(caplog):
     import logging
     from video_runners.diagnostics import event

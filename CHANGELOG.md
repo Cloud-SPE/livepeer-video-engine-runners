@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Fixed
 
 - Normalize mount ordering in CPU cleanup fingerprints while retaining checks for changed mount sources, permissions and propagation.
+- Print a bounded redacted CPU step log on failure even when resource inspection fails, preserving the original startup diagnostic in CI.
 
 ## [0.2.0] - 2026-10-16
 

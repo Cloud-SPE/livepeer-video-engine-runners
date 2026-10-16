@@ -459,6 +459,12 @@ class CPUHarness:
         ]
 
     def command(self, name, args):
+        def redacted(content):
+            for key, value in self.values.items():
+                if value and any(word in key for word in ("TOKEN", "SECRET")):
+                    content = content.replace(value, "[redacted]")
+            return content
+
         self.receipt.data["step"] = name
         self.receipt.save()
         with (self.receipt.directory / f"{name}.log").open("w") as output:
@@ -473,6 +479,15 @@ class CPUHarness:
                 )
             except subprocess.CalledProcessError:
                 self.receipt.result({"step": name, "status": "failed"})
+                output.flush()
+                content = redacted(
+                    (self.receipt.directory / f"{name}.log").read_text(errors="replace")
+                )
+                print(
+                    f"{name} failed; last 60 log lines:\n"
+                    + "\n".join(content.splitlines()[-60:]),
+                    file=sys.stderr,
+                )
                 try:
                     snapshot = capture(self.path, self.docker)
                     for item in snapshot["resources"]:
@@ -487,12 +502,7 @@ class CPUHarness:
                             stderr=subprocess.STDOUT,
                             check=True,
                         )
-                        content = result.stdout
-                        for key, value in self.values.items():
-                            if value and any(
-                                word in key for word in ("TOKEN", "SECRET")
-                            ):
-                                content = content.replace(value, "[redacted]")
+                        content = redacted(result.stdout)
                         (self.receipt.directory / (item["role"] + ".log")).write_text(
                             content
                         )

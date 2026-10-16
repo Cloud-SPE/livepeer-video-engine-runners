@@ -99,13 +99,16 @@ Docker daemon; see [security](../../SECURITY.md).
 Run directories are mode `0700`; receipts/manifests/private env are mode `0600`.
 The generated CPU catalog bind is readable by the non-root controller and
 contains no credentials. CPU failures capture service logs with the run's known
-tokens redacted. Review raw logs before sharing. Public reports must omit hostnames, actual
+tokens redacted. A failed step also prints its last 60 redacted log lines even
+when resource inspection fails, so cleanup errors do not hide startup failures.
+Review raw logs before sharing. Public reports must omit hostnames, actual
 addresses, account identities, GPU UUIDs, private paths/resource names and
 worktree-derived run IDs. Keep GPU type/driver, immutable image/model revisions,
 workload, measurements and outcome; do not publish raw receipts or resource
 manifests without checking their host-specific fields. CI uploads only the CPU receipt
 and resource manifest, using a pinned artifact action with seven-day retention;
-it excludes private inputs and raw logs. CI changes have no effect until pushed.
+artifacts exclude private inputs and raw logs. The bounded redacted step excerpt
+appears in the CI console. CI changes have no effect until pushed.
 
 ## Hardware validation coordination
 
