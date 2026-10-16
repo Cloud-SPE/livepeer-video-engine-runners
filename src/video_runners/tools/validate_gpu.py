@@ -14,8 +14,6 @@ import sys
 import threading
 import time
 
-import av
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 from video_runners.tools.evidence import (
     HostLease,
@@ -135,6 +133,8 @@ class Telemetry:
 
 
 def verify_video(path: Path) -> dict:
+    import av
+
     hashes, preview = set(), None
     with av.open(str(path)) as container:
         stream = container.streams.video[0]

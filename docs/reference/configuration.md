@@ -42,16 +42,19 @@ Source: [catalog.py](../../src/video_runners/catalog.py).
 
 Source: [contracts.py](../../src/video_runners/contracts.py).
 
-| Field             | Type          | Default  |
-| ----------------- | ------------- | -------- |
-| `prompt`          | `str`         | Required |
-| `negative_prompt` | `str`         | `''`     |
-| `width`           | `int \| None` | `None`   |
-| `height`          | `int \| None` | `None`   |
-| `num_frames`      | `int \| None` | `None`   |
-| `fps`             | `int \| None` | `None`   |
-| `steps`           | `int \| None` | `None`   |
-| `seed`            | `int \| None` | `None`   |
+| Field              | Type            | Default  |
+| ------------------ | --------------- | -------- |
+| `prompt`           | `str`           | Required |
+| `negative_prompt`  | `str`           | `''`     |
+| `width`            | `int \| None`   | `None`   |
+| `height`           | `int \| None`   | `None`   |
+| `num_frames`       | `int \| None`   | `None`   |
+| `fps`              | `int \| None`   | `None`   |
+| `steps`            | `int \| None`   | `None`   |
+| `seed`             | `int \| None`   | `None`   |
+| `guidance_scale`   | `float \| None` | `None`   |
+| `guidance_scale_2` | `float \| None` | `None`   |
+| `flow_shift`       | `float \| None` | `None`   |
 
 ## Trusted managed policy fields
 
@@ -66,6 +69,44 @@ this policy. `allow_local_images` is for CPU fixtures without a GPU.
 | Each model | `command`, `env`, `health_path`, `image`, `memory`, `mounts`, `port`, `shm_size`, `timeout`, `user` |
 
 ## Python commands
+
+### python -m video_runners.tools.quality
+
+Source: [tools/quality.py](../../src/video_runners/tools/quality.py).
+
+| Argument          | Choices | Default                                          | Requirement / action |
+| ----------------- | ------- | ------------------------------------------------ | -------------------- |
+| `--suite-file`    | —       | `ROOT / 'benchmarks/video-quality/suites.json'`  | —                    |
+| `--suite`         | —       | `'pilot'`                                        | —                    |
+| `--experiment`    | —       | `[]`                                             | `append`             |
+| `--output`        | —       | `None`                                           | Required             |
+| `--plan`          | —       | `None`                                           | Required             |
+| `--run-dir`       | —       | `None`                                           | Required             |
+| `--max-jobs`      | —       | `1`                                              | —                    |
+| `--discovery`     | —       | `'http://127.0.0.1:8937/discover-orchestrators'` | —                    |
+| `--signer`        | —       | `'http://127.0.0.1:8937'`                        | —                    |
+| `--run-dir`       | —       | `None`                                           | Required             |
+| `--results-file`  | —       | `None`                                           | Required             |
+| `--evaluator-ref` | —       | `None`                                           | Required             |
+| `--run-dir`       | —       | `None`                                           | Required; `append`   |
+| `--output`        | —       | `None`                                           | Required             |
+| `--key`           | —       | `None`                                           | Required             |
+| `--ratings`       | —       | `None`                                           | Required             |
+| `--output`        | —       | `None`                                           | Required             |
+
+### python -m video_runners.tools.quality_vbench
+
+Source: [tools/quality_vbench.py](../../src/video_runners/tools/quality_vbench.py).
+
+| Argument            | Choices           | Default  | Requirement / action |
+| ------------------- | ----------------- | -------- | -------------------- |
+| `--run-dir`         | —                 | `None`   | Required             |
+| `--output`          | —                 | `None`   | Required             |
+| `--evaluator-ref`   | —                 | `None`   | Required             |
+| `--dimension`       | —                 | `None`   | Required; `append`   |
+| `--device`          | `('cpu', 'cuda')` | `'cuda'` | —                    |
+| `--gpu-uuid`        | —                 | `''`     | —                    |
+| `--lease-directory` | —                 | `None`   | —                    |
 
 ### video-runner
 
@@ -107,21 +148,26 @@ Source: [controller/app.py](../../src/video_runners/controller/app.py).
 
 Source: [client.py](../../src/video_runners/client.py).
 
-| Argument       | Choices                         | Default                                          | Requirement / action |
-| -------------- | ------------------------------- | ------------------------------------------------ | -------------------- |
-| `--prompt`     | —                               | `'A red fox running through fresh snow at dawn'` | —                    |
-| `--model`      | —                               | `DEFAULT_MODEL`                                  | —                    |
-| `--mode`       | `('single-shot', 'persistent')` | `'single-shot'`                                  | —                    |
-| `--clips`      | —                               | `1`                                              | —                    |
-| `--width`      | —                               | `None`                                           | —                    |
-| `--height`     | —                               | `None`                                           | —                    |
-| `--num-frames` | —                               | `None`                                           | —                    |
-| `--steps`      | —                               | `None`                                           | —                    |
-| `--seed`       | —                               | `None`                                           | —                    |
-| `--output`     | —                               | `'clip'`                                         | —                    |
-| `--discovery`  | —                               | `DEFAULT_DISCOVERY`                              | —                    |
-| `--signer`     | —                               | `''`                                             | —                    |
-| `--list`       | —                               | `False`                                          | `store_true`         |
+| Argument             | Choices                         | Default                                          | Requirement / action |
+| -------------------- | ------------------------------- | ------------------------------------------------ | -------------------- |
+| `--prompt`           | —                               | `'A red fox running through fresh snow at dawn'` | —                    |
+| `--model`            | —                               | `DEFAULT_MODEL`                                  | —                    |
+| `--mode`             | `('single-shot', 'persistent')` | `'single-shot'`                                  | —                    |
+| `--clips`            | —                               | `1`                                              | —                    |
+| `--width`            | —                               | `None`                                           | —                    |
+| `--height`           | —                               | `None`                                           | —                    |
+| `--num-frames`       | —                               | `None`                                           | —                    |
+| `--steps`            | —                               | `None`                                           | —                    |
+| `--seed`             | —                               | `None`                                           | —                    |
+| `--fps`              | —                               | `None`                                           | —                    |
+| `--negative-prompt`  | —                               | `''`                                             | —                    |
+| `--guidance-scale`   | —                               | `None`                                           | —                    |
+| `--guidance-scale-2` | —                               | `None`                                           | —                    |
+| `--flow-shift`       | —                               | `None`                                           | —                    |
+| `--output`           | —                               | `'clip'`                                         | —                    |
+| `--discovery`        | —                               | `DEFAULT_DISCOVERY`                              | —                    |
+| `--signer`           | —                               | `''`                                             | —                    |
+| `--list`             | —                               | `False`                                          | `store_true`         |
 
 ### video-stub-engine
 

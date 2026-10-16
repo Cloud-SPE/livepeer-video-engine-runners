@@ -34,6 +34,9 @@ class OpenAIVideosClient(EngineClient):
             "fps": job.fps,
             "num_inference_steps": job.steps,
             "seed": job.seed,
+            "guidance_scale": job.guidance_scale,
+            "guidance_scale_2": job.guidance_scale_2,
+            "flow_shift": job.flow_shift,
         }
         for name, value in fields.items():
             if value is not None:

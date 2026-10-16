@@ -106,3 +106,29 @@ def test_every_model_has_an_immutable_weight_plan():
             for asset in [spec, *spec.get("extra_files", [])]:
                 assert re.fullmatch(r"[0-9a-f]{40}", asset["revision"])
             assert spec["storage"] in {"hf", "models"}
+
+
+def test_lightwan_nvfp4_plan_skips_unneeded_full_precision_transformers():
+    import fnmatch
+
+    manifest = json.loads((ROOT / "configs/model-assets.json").read_text())
+    spec = manifest["models"]["lightx2v"]["lightwan2.2-t2v-a14b-nvfp4"]
+    patterns = spec["allow_patterns"]
+    assert any(
+        fnmatch.fnmatch("high_noise_model/config.json", pattern) for pattern in patterns
+    )
+    assert not any(
+        fnmatch.fnmatch(
+            "high_noise_model/diffusion_pytorch_model-00001-of-00006.safetensors",
+            pattern,
+        )
+        for pattern in patterns
+    )
+    assert {extra["filename"] for extra in spec["extra_files"]} == {
+        "Wan2.2-T2V-A14B_NVFP4_Sparse_high.safetensors",
+        "Wan2.2-T2V-A14B_NVFP4_Sparse_low.safetensors",
+    }
+    assert all(
+        filename in spec["required_files"]
+        for filename in [extra["filename"] for extra in spec["extra_files"]]
+    )

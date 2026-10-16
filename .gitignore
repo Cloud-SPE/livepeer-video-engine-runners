@@ -10,5 +10,6 @@ __pycache__/
 .engine-images.env
 /artifacts/gpu-validation/
 /artifacts/cpu-validation/
+/artifacts/video-quality/
 /.idea/
 /dist/

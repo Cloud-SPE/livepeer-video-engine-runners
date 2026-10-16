@@ -65,6 +65,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--num-frames", type=int)
     parser.add_argument("--steps", type=int)
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--fps", type=int)
+    parser.add_argument("--negative-prompt", default="")
+    parser.add_argument("--guidance-scale", type=float)
+    parser.add_argument("--guidance-scale-2", type=float)
+    parser.add_argument("--flow-shift", type=float)
     parser.add_argument("--output", default="clip", help="Output file prefix")
     parser.add_argument("--discovery", default=DEFAULT_DISCOVERY)
     parser.add_argument("--signer", default="", help="Remote signer URL (paid path)")
@@ -82,6 +87,16 @@ def _job_payload(args: argparse.Namespace, index: int = 0) -> dict[str, Any]:
         "num_frames": args.num_frames,
         "steps": args.steps,
         "seed": None if args.seed is None else args.seed + index,
+        **{
+            key: getattr(args, key, None)
+            for key in (
+                "fps",
+                "negative_prompt",
+                "guidance_scale",
+                "guidance_scale_2",
+                "flow_shift",
+            )
+        },
     }
     return {key: value for key, value in payload.items() if value is not None}
 
@@ -103,7 +118,9 @@ async def list_apps(discovery_url: str) -> None:
             )
 
 
-async def single_shot(args: argparse.Namespace, signer_url: str | None) -> None:
+async def single_shot(
+    args: argparse.Namespace, signer_url: str | None
+) -> dict[str, Any]:
     cursor = await runner_selector(  # Livepeer: 1
         discovery_url=args.discovery, app=SINGLE_SHOT_APP.format(model=args.model)
     )
@@ -118,6 +135,7 @@ async def single_shot(args: argparse.Namespace, signer_url: str | None) -> None:
     meta: dict[str, Any] = {}
     chunks: list[bytes] = []
     event = ""
+    accepted_model = None
     async with stream:
         async for line in stream.aiter_lines():
             if line.startswith("event: "):
@@ -129,6 +147,7 @@ async def single_shot(args: argparse.Namespace, signer_url: str | None) -> None:
             if event == "status":
                 log.info("status %s progress=%s", data["state"], data.get("progress"))
             elif event == "accepted":
+                accepted_model = data.get("model")
                 log.info("accepted by %s", data["model"])
             elif event == "video-start":
                 meta = data
@@ -141,6 +160,14 @@ async def single_shot(args: argparse.Namespace, signer_url: str | None) -> None:
     if not meta or len(chunks) != meta["chunks"]:
         raise LivepeerGatewayError("stream ended before the video arrived")
     _save(Path(f"{args.output}.mp4"), b"".join(chunks), meta["sha256"])
+    return {
+        "runner_url": runner.url,
+        "runner_id": runner.runner_id,
+        "orchestrator_url": runner.orchestrator_url,
+        "app": runner.app,
+        "accepted_model": accepted_model,
+        "sha256": meta["sha256"],
+    }
 
 
 async def _drain_video(

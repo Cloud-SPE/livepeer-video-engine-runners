@@ -163,6 +163,65 @@ def test_authentication_before_daemon_access(tmp_path):
     asyncio.run(scenario())
 
 
+def test_failed_controller_can_deactivate_verified_resources_without_relaunch(tmp_path):
+    async def scenario():
+        async with setup(tmp_path) as (client, controller, daemon, _):
+            await activate(client, controller, "first", "initial")
+            # A failed startup recovery leaves a stopped, durably recorded engine.
+            for container in daemon.containers.values():
+                container["State"]["Running"] = False
+            controller.state["active"] = None
+            controller.phase, controller.error = "error", "startup recovery failed"
+            controller.save()
+            before = len(daemon.calls)
+            body = {"operation_id": "stop-failed"}
+            assert (await client.post("/v1/deactivate", json=body)).status == 401
+            assert (
+                await client.post(
+                    "/v1/activate",
+                    json={"operation_id": "unsafe-start", "model": "second"},
+                    headers=HEADERS,
+                )
+            ).status == 409
+            response = await client.post("/v1/deactivate", json=body, headers=HEADERS)
+            assert response.status == 202
+            await controller.task
+            assert controller.phase == "idle" and controller.error == ""
+            assert not daemon.containers and not controller.state["containers"]
+            assert controller.state["last_good"] == "first"
+            assert controller.state["enabled"] is False
+            assert not any(
+                path.endswith("/start") for _, path, _ in daemon.calls[before:]
+            )
+
+    asyncio.run(scenario())
+
+
+def test_failed_controller_deactivation_still_refuses_unrecorded_resources(tmp_path):
+    async def scenario():
+        async with setup(tmp_path) as (client, controller, daemon, _):
+            await activate(client, controller, "first", "initial")
+            stray = "f" * 64
+            daemon.containers[stray] = copy.deepcopy(
+                next(iter(daemon.containers.values()))
+            )
+            controller.phase, controller.error = "error", "startup recovery failed"
+            before = len(daemon.calls)
+            response = await client.post(
+                "/v1/deactivate", json={"operation_id": "stop-failed"}, headers=HEADERS
+            )
+            assert response.status == 202
+            await controller.task
+            assert controller.phase == "error"
+            assert stray in daemon.containers
+            assert not any(
+                path.endswith("/stop") or method == "DELETE"
+                for method, path, _ in daemon.calls[before:]
+            )
+
+    asyncio.run(scenario())
+
+
 def test_switch_replay_and_stop_before_start(tmp_path):
     async def scenario():
         async with setup(tmp_path) as (client, controller, daemon, _):

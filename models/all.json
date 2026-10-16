@@ -171,6 +171,43 @@
         "fps": 16,
         "steps": 40
       }
+    },
+    {
+      "id": "lightx2v-lightwan2.2-t2v-a14b-nvfp4",
+      "engine": "lightx2v",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "wan2.2_moe",
+        "--task",
+        "t2v",
+        "--model_path",
+        "/models/LightWan2.2-T2V-A14B-NVFP4",
+        "--config_json",
+        "/app/configs/lightx2v/wan22_nvfp4.json",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "port": 9100,
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+      },
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 81
+      },
+      "task": "t2v",
+      "startup_timeout_s": 3600,
+      "job_timeout_s": 3600,
+      "supports_negative_prompt": false
     }
   ]
 }

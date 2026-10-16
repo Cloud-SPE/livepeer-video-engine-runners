@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any
 
 
@@ -22,6 +23,9 @@ class JobRequest:
     fps: int | None = None
     steps: int | None = None
     seed: int | None = None
+    guidance_scale: float | None = None
+    guidance_scale_2: float | None = None
+    flow_shift: float | None = None
 
     @classmethod
     def from_payload(
@@ -42,6 +46,22 @@ class JobRequest:
                 raise ValueError(f"{name} must be a non-negative integer")
             return value
 
+        def _float(name: str, *, positive=False) -> float | None:
+            value = merged.get(name)
+            if value is None:
+                return None
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+                or (positive and value == 0)
+            ):
+                raise ValueError(
+                    f"{name} must be a finite {'positive' if positive else 'non-negative'} number"
+                )
+            return float(value)
+
         return cls(
             prompt=prompt.strip(),
             negative_prompt=str(merged.get("negative_prompt", "")),
@@ -51,6 +71,9 @@ class JobRequest:
             fps=_int("fps"),
             steps=_int("steps"),
             seed=_int("seed"),
+            guidance_scale=_float("guidance_scale"),
+            guidance_scale_2=_float("guidance_scale_2"),
+            flow_shift=_float("flow_shift", positive=True),
         )
 
 

@@ -1,0 +1,15 @@
+{
+  "name": "VBench",
+  "repository": "https://github.com/Vchitect/VBench",
+  "revision": "fd18b3d055cb0fc6f066ca90fe2c3c8cbb698490",
+  "mode": "custom_input",
+  "dimensions": [
+    "subject_consistency",
+    "background_consistency",
+    "motion_smoothness",
+    "dynamic_degree",
+    "aesthetic_quality",
+    "imaging_quality"
+  ],
+  "imaging_quality_preprocessing_mode": "longer"
+}

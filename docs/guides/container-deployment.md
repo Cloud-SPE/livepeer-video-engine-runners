@@ -131,6 +131,38 @@ and one reserved GPU UUID per managed instance. Share the existing GPU lease
 volume across cooperating controllers. Actual multi-GPU validation remains
 pending; independent configuration is not hardware proof.
 
+### Optional LightWan A14B NVFP4 profile
+
+Prepare the added profile explicitly; preparation defaults and existing models
+remain unchanged:
+
+```sh
+docker compose --project-directory . --env-file "$VIDEO_ENV" \
+  -f deploy/compose/assets.yml run --rm --build model-tools lightx2v \
+  --model lightwan2.2-t2v-a14b-nvfp4
+python3 src/video_runners/tools/prepare_engines.py lightx2v
+```
+
+The pinned asset plan downloads base configuration, tokenizer, T5 and VAE files,
+plus two pinned NVFP4 expert files into the external model volume. It skips the
+unused BF16 transformer shards and never removes existing cached models. The
+prepared LightX2V image contains the new configuration. Keep the generated
+`.engine-images.env` when starting/recreating the existing Compose selection.
+
+Select `lightwan2.2-t2v-a14b-nvfp4` in the individual LightX2V catalog, or
+`lightx2v-lightwan2.2-t2v-a14b-nvfp4` in the combined catalog. Follow the normal
+[policy-update procedure](#stop-restart-and-update) before replacing an active
+controller's trusted catalog. The profile uses four trained steps, 81 frames at
+16 FPS, sparse attention, CPU text-encoder offload and GPU-resident NVFP4 experts.
+It does not accept negative prompts; sampling recipe controls remain engine
+configuration. Its trusted host-memory limit is 32 GiB.
+
+The [5090 pilot](../validation/reports/video-quality-2026-10-16.md) delivered both
+832×480 and 1280×720 clips. The 720p run sampled about 31 GiB of VRAM: treat it as
+a tight, measured workload, not a guarantee that longer/larger jobs fit. No paid
+or persistent-delivery check was added for this profile. Full-precision A14B and
+NVFP4 LightWan are distinct checkpoints and launch recipes.
+
 ## Use your existing Livepeer orchestrator
 
 Production always connects to an existing `livepeer/node`. Configure:
@@ -245,7 +277,7 @@ docker run --rm --runtime=runc --entrypoint python3 \
 docker compose --project-directory . --env-file "$VIDEO_ENV" -f deploy/compose/assets.yml run --rm --build model-tools lightx2v --model minimax-h3-4step
 ```
 
-Substitute your configured model volume name. H3 needs its Diffusers components, including its audio components, as described by the pinned [LightX2V H3 guide](https://github.com/ModelTC/LightX2V/blob/8e86555809efd20138d3a4e1f937ee306cdf0ee0/scripts/minimax_h3/README.md). H3 and Wan A14B are optional large-model templates, not validated RTX 5090 recommendations.
+Substitute your configured model volume name. H3 needs its Diffusers components, including its audio components, as described by the pinned [LightX2V H3 guide](https://github.com/ModelTC/LightX2V/blob/8e86555809efd20138d3a4e1f937ee306cdf0ee0/scripts/minimax_h3/README.md). H3 and full-precision vLLM Wan A14B remain optional large-model templates without a successful RTX 5090 generation check. The separate LightWan NVFP4 profile above has its own 480p/720p pilot evidence.
 
 Managed engines run offline and cannot pull images or download missing weights through the controller. Review the trusted [`configs/controller/`](../../configs/controller) catalogs separately from the public request defaults in [`models/`](../../models). SGLang allows 48 GiB host RAM: its text encoder exceeded the original 16 GiB cgroup limit during hardware testing. Host RAM and GPU VRAM are separate limits. Other model limits and offload flags must also be validated on the target host.
 
@@ -316,6 +348,13 @@ docker compose --env-file "$VIDEO_ENV" --env-file .engine-images.env -f compose.
 ```
 
 Stop the runner before the controller and proxy so it can deregister and deactivate. Managed engines are created by the controller and are not Compose services. Keep state even though the engine container is disposable. Do not change image references, catalog, namespace, GPU, mounts, or engine network while a recorded engine exists: configuration drift intentionally blocks mutation. Deactivate using the old configuration first, then update.
+
+After a startup/recovery failure, an authenticated controller deactivation is
+allowed once the in-progress operation has ended. It still verifies every
+recorded resource and refuses unrecorded containers or configuration drift. New
+activations remain blocked in the error state. A successful deactivation clears
+the error and disables restoration until an explicit activation; it preserves
+the last-good model and durable journal.
 
 Controller restart resets recorded engines before admission to clear potentially orphaned work. An interrupted activation recovers the last good model; interrupted deactivation remains stopped. The state-directory lock excludes duplicate controllers using the same state volume; the shared GPU lease excludes different managed deployments claiming that GPU.
 

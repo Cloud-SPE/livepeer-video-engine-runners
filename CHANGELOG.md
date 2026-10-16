@@ -4,7 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in video-quality harness with versioned prompts/suites, reproducible plans,
+  bounded SDK generation, checksum-checked resume, isolated pinned VBench
+  evaluation and blind video review with exportable preferences/usability.
+- Optional LightWan 2.2 A14B NVFP4 profile with pinned selective assets and
+  matching launch policy; real RTX 5090 SDK pilots at 480p and 720p. Existing
+  models, defaults and ownership modes remain unchanged.
+- Optional OpenAI-video sampling controls for guidance scales and flow shift,
+  with client FPS/negative-prompt options and backend capability checks.
+
 ### Fixed
+
+- Permit authenticated deactivation after a controller operation fails, while
+  retaining durable ownership checks and rejecting new activation until recovery.
 
 - Normalize mount ordering in CPU cleanup fingerprints while retaining checks for changed mount sources, permissions and propagation.
 - Print a bounded redacted CPU step log on failure even when resource inspection fails, preserving the original startup diagnostic in CI.

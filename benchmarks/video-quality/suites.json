@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "catalog": "../../models/all.json",
+  "prompts": "prompts.jsonl",
+  "provenance": [
+    "../../configs/engine-images.json",
+    "../../configs/model-assets.json",
+    "../../configs/controller/all.json",
+    "../../configs/lightx2v/wan21_t2v_1_3b.json",
+    "../../src/video_runners/client.py",
+    "../../src/video_runners/contracts.py",
+    "../../src/video_runners/backends/openai.py",
+    "../../src/video_runners/backends/lightx2v.py",
+    "../../configs/lightx2v/wan22_nvfp4.json"
+  ],
+  "experiments": [
+    {
+      "id": "sglang-current",
+      "model": "sglang-fastwan2.1-t2v-1.3b",
+      "parameters": {}
+    },
+    {
+      "id": "lightx2v-current",
+      "model": "lightx2v-wan2.1-t2v-1.3b",
+      "parameters": {}
+    },
+    {
+      "id": "vllm-current",
+      "model": "vllm-omni-wan2.2-ti2v-5b",
+      "parameters": {}
+    },
+    {
+      "id": "sglang-native",
+      "model": "sglang-fastwan2.1-t2v-1.3b",
+      "parameters": {
+        "height": 448
+      }
+    },
+    {
+      "id": "vllm-50",
+      "model": "vllm-omni-wan2.2-ti2v-5b",
+      "parameters": {
+        "steps": 50
+      }
+    },
+    {
+      "id": "vllm-720p-50",
+      "model": "vllm-omni-wan2.2-ti2v-5b",
+      "parameters": {
+        "width": 1280,
+        "height": 704,
+        "num_frames": 121,
+        "fps": 24,
+        "steps": 50,
+        "guidance_scale": 5,
+        "flow_shift": 5
+      }
+    },
+    {
+      "id": "lightwan14b-nvfp4",
+      "model": "lightx2v-lightwan2.2-t2v-a14b-nvfp4",
+      "parameters": {}
+    },
+    {
+      "id": "lightwan14b-720p",
+      "model": "lightx2v-lightwan2.2-t2v-a14b-nvfp4",
+      "parameters": {
+        "width": 1280,
+        "height": 720
+      }
+    }
+  ],
+  "suites": {
+    "pilot": {
+      "prompts": ["fox-walk"],
+      "seeds": [42],
+      "experiments": [
+        "sglang-current",
+        "lightx2v-current",
+        "vllm-current",
+        "sglang-native",
+        "vllm-50",
+        "vllm-720p-50",
+        "lightwan14b-nvfp4",
+        "lightwan14b-720p"
+      ]
+    },
+    "screen": {
+      "prompts": [
+        "fox-walk",
+        "portrait-turn",
+        "hands-pour",
+        "runner-track",
+        "ocean-wave",
+        "camera-orbit",
+        "objects-relations",
+        "rain-night"
+      ],
+      "seeds": [42, 123],
+      "experiments": [
+        "sglang-current",
+        "lightx2v-current",
+        "vllm-current",
+        "sglang-native",
+        "vllm-50",
+        "vllm-720p-50",
+        "lightwan14b-nvfp4",
+        "lightwan14b-720p"
+      ]
+    },
+    "confirm": {
+      "prompts": [
+        "fox-walk",
+        "portrait-turn",
+        "hands-pour",
+        "runner-track",
+        "ocean-wave",
+        "camera-orbit",
+        "objects-relations",
+        "rain-night",
+        "fence-pan",
+        "dog-fetch",
+        "leaves-breeze",
+        "train-station",
+        "animation-walk",
+        "product-rotation",
+        "cloth-motion",
+        "basketball-bounce",
+        "market-pan",
+        "snow-globe",
+        "watercolor-river",
+        "two-people"
+      ],
+      "seeds": [42, 123, 777],
+      "experiments": [
+        "sglang-current",
+        "lightx2v-current",
+        "vllm-current",
+        "sglang-native",
+        "vllm-50",
+        "vllm-720p-50",
+        "lightwan14b-nvfp4",
+        "lightwan14b-720p"
+      ]
+    }
+  }
+}

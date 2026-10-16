@@ -173,7 +173,10 @@ class Controller(ControllerState):
             return operations[operation_id]
         if model is not None and model not in self.policy.models:
             raise ValueError("unknown catalog model")
-        if self.phase not in {"idle", "ready"} or (self.task and not self.task.done()):
+        stopping_failed = model is None and self.phase == "error"
+        if (self.phase not in {"idle", "ready"} and not stopping_failed) or (
+            self.task and not self.task.done()
+        ):
             raise RuntimeError("controller is busy or requires recovery")
         while len(operations) >= 128:
             del operations[next(iter(operations))]
@@ -202,6 +205,7 @@ class Controller(ControllerState):
                 self.state["last_good"] = operation["model"]
             self.state["enabled"] = operation["model"] is not None
             self.phase = "ready" if operation["model"] else "idle"
+            self.error = ""
             operation.update(
                 state="succeeded",
                 endpoint=(

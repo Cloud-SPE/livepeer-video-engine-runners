@@ -65,6 +65,12 @@ recorded engine using the old policy as described in the
 [deployment guide](container-deployment.md#stop-restart-and-update). Catalog regeneration
 does not update a deployed controller or its durable state.
 
+Asset plans may specify a nonempty `allow_patterns` list for selective snapshot
+downloads. Patterns select files from the pinned base revision; `extra_files`
+retain their own repository/revision pins, and `required_files` still gates
+readiness. This is used by LightWan NVFP4 to avoid unused BF16 expert downloads.
+Existing plans without patterns still download their full snapshots.
+
 ## Private operator settings
 
 Keep `.env`, `.engine-images.env`, host keys and credential files outside Git.

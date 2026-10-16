@@ -20,6 +20,13 @@ class LightX2VClient(EngineClient):
     }
 
     async def submit(self, job: JobRequest) -> str:
+        if any(
+            value is not None
+            for value in (job.guidance_scale, job.guidance_scale_2, job.flow_shift)
+        ):
+            raise EngineError(
+                "LightX2V sampling controls require an engine configuration"
+            )
         body: dict[str, Any] = {
             "prompt": job.prompt,
             # Without a result path the server skips saving and /result 404s.

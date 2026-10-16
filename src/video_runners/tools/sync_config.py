@@ -11,6 +11,8 @@ import re
 ROOT = Path(__file__).resolve().parents[3]
 ENGINES = ("sglang", "lightx2v", "vllm-omni")
 CLI_SOURCES = {
+    "python -m video_runners.tools.quality": "tools/quality.py",
+    "python -m video_runners.tools.quality_vbench": "tools/quality_vbench.py",
     "video-runner": "runner/app.py",
     "video-controller": "controller/app.py",
     "video-client": "client.py",

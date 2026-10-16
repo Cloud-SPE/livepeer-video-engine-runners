@@ -276,6 +276,61 @@
       "timeout": 3600,
       "shm_size": 8589934592,
       "memory": 34359738368
+    },
+    "lightx2v-lightwan2.2-t2v-a14b-nvfp4": {
+      "image": "${LIGHTX2V_ENGINE_IMAGE}",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "wan2.2_moe",
+        "--task",
+        "t2v",
+        "--model_path",
+        "/models/LightWan2.2-T2V-A14B-NVFP4",
+        "--config_json",
+        "/app/configs/lightx2v/wan22_nvfp4.json",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/lightx2v/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/lightx2v/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/lightx2v/triton",
+        "CUDA_CACHE_PATH": "/cache/lightx2v/cuda"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "source": "${MODELS_VOLUME}",
+          "target": "/models",
+          "read_only": true,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 3600,
+      "shm_size": 8589934592,
+      "memory": 34359738368
     }
   }
 }

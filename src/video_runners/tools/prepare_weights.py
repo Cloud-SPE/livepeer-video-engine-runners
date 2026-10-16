@@ -33,11 +33,22 @@ def main() -> None:
 
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     args.models_dir.mkdir(parents=True, exist_ok=True)
+    options = {}
+    if "allow_patterns" in spec:
+        patterns = spec["allow_patterns"]
+        if (
+            not isinstance(patterns, list)
+            or not patterns
+            or not all(isinstance(value, str) and value for value in patterns)
+        ):
+            parser.error("allow_patterns must be a nonempty list of filename patterns")
+        options["allow_patterns"] = patterns
     if spec["storage"] == "hf":
         location = snapshot_download(
             spec["repo"],
             revision=spec["revision"],
             cache_dir=str(args.cache_dir / "hub"),
+            **options,
         )
         # Engines resolve the repository's default revision in offline mode.
         # Point that ref to the exact staged revision rather than a moving main.
@@ -57,6 +68,7 @@ def main() -> None:
             spec["repo"],
             revision=spec["revision"],
             local_dir=str(args.models_dir / spec["directory"]),
+            **options,
         )
     for extra in spec.get("extra_files", []):
         hf_hub_download(
@@ -88,7 +100,7 @@ def main() -> None:
     if missing:
         parser.exit(
             1,
-            "Additional local assets are required; see the MiniMax-H3 conversion instructions in docs/guides/container-deployment.md.\n",
+            "Additional local assets are required; see the model preparation instructions in docs/guides/container-deployment.md.\n",
         )
 
 

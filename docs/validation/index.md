@@ -1,12 +1,13 @@
 # Validation matrix
 
 This is an evidence index, not a claim that a deployment is running. Dated GPU
-reports describe the October 15–16, 2026 runs. Their generated videos/raw receipts
-were removed at the operator's request; measurements and hashes remain in the
-reports. Public summaries omit operator hostnames, actual addresses, account
-identities, private resource names and worktree-derived run IDs. GPU/image/model
-versions and measured results remain to describe the tested configuration.
-Wallet/model/cache volumes and host keys were preserved.
+reports describe the October 15–16, 2026 runs. Earlier deployment-trial videos and
+raw receipts were removed at the operator's request; quality-pilot clips remain
+private for review. Measurements and hashes remain in the reports. Public
+summaries omit operator hostnames, actual addresses, account identities, private
+resource names and worktree-derived run IDs. GPU/image/model versions and measured
+results describe the tested configuration. Wallet/model/cache volumes and host
+keys were preserved.
 
 ## Automated checks
 
@@ -48,23 +49,25 @@ fixture, bundled and external recipes. This adds no GPU or paid-operation eviden
 
 ## Recorded hardware and payment evidence
 
-| Area                                       | Status                         | Evidence and scope                                                                                                                                                                |
-| ------------------------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SGLang FastWan 1.3B                        | Recorded GPU pass              | Both modes at 512×288, then 832×480 and 121-frame clips; [initial report](reports/gpu-validation-2026-10-15.md), [workload report](reports/operations-validation-2026-10-15.md)   |
-| LightX2V Wan 1.3B                          | Recorded GPU pass              | Same two-mode workload progression; model-specific steps/frame counts in the reports                                                                                              |
-| vLLM-Omni Wan 5B                           | Recorded GPU pass              | Both modes and longer workloads; later profile uses CPU offload and VAE tiling                                                                                                    |
-| Cross-engine switching                     | Recorded GPU pass              | Combined catalog switches; observed times, not guaranteed deadlines                                                                                                               |
-| Selected recovery behavior                 | Recorded GPU pass              | Twelve recorded cases across three engines, each followed by fresh generation; [case table](reports/operations-validation-2026-10-15.md#recovery-procedure)                       |
-| External model volumes and offline reuse   | Recorded host pass             | Download reuse, offline reload, teardown preservation and shared GPU lease; [storage checks](reports/gpu-validation-2026-10-15.md#storage-and-operational-checks)                 |
-| Replacement `livepeer/node` signer         | Recorded paid SSE pass         | Three real GPU videos via local signer and direct LAN; [node paid report](reports/node-paid-validation-2026-10-16.md). Paid persistent delivery and settlement remain unvalidated |
-| Legacy go-livepeer paid requests           | Historical compatibility trial | Six verified videos and signed payment batches; [legacy report](reports/paid-validation-2026-10-15.md), outside the supported deployment path                                     |
-| Winning-ticket redemption/final settlement | Pending                        | Signed batches and generated videos are insufficient evidence                                                                                                                     |
+| Area                                             | Status                         | Evidence and scope                                                                                                                                                                |
+| ------------------------------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SGLang FastWan 1.3B                              | Recorded GPU pass              | Both modes at 512×288, then 832×480 and 121-frame clips; [initial report](reports/gpu-validation-2026-10-15.md), [workload report](reports/operations-validation-2026-10-15.md)   |
+| LightX2V Wan 1.3B                                | Recorded GPU pass              | Same two-mode workload progression; model-specific steps/frame counts in the reports                                                                                              |
+| vLLM-Omni Wan 5B                                 | Recorded GPU pass              | Both modes and longer workloads; later profile uses CPU offload and VAE tiling                                                                                                    |
+| Cross-engine switching                           | Recorded GPU pass              | Combined catalog switches; observed times, not guaranteed deadlines                                                                                                               |
+| Selected recovery behavior                       | Recorded GPU pass              | Twelve recorded cases across three engines, each followed by fresh generation; [case table](reports/operations-validation-2026-10-15.md#recovery-procedure)                       |
+| External model volumes and offline reuse         | Recorded host pass             | Download reuse, offline reload, teardown preservation and shared GPU lease; [storage checks](reports/gpu-validation-2026-10-15.md#storage-and-operational-checks)                 |
+| Replacement `livepeer/node` signer               | Recorded paid SSE pass         | Three real GPU videos via local signer and direct LAN; [node paid report](reports/node-paid-validation-2026-10-16.md). Paid persistent delivery and settlement remain unvalidated |
+| Legacy go-livepeer paid requests                 | Historical compatibility trial | Six verified videos and signed payment batches; [legacy report](reports/paid-validation-2026-10-15.md), outside the supported deployment path                                     |
+| Optional LightWan A14B NVFP4 and quality harness | Recorded 480p/720p SDK pilot   | [Quality pilot](reports/video-quality-2026-10-16.md); native workload evidence, human quality confirmation pending                                                                |
+| Winning-ticket redemption/final settlement       | Pending                        | Signed batches and generated videos are insufficient evidence                                                                                                                     |
 
 ## Pending validation
 
 - Replacement-node orchestrator/signer paid persistent-session delivery; single-shot SSE passed for all three default engines.
 - Final settlement, production pricing, public HTTPS and long-duration operation.
-- MiniMax-H3, Wan A14B and the optional non-distilled SGLang model on hardware.
+- MiniMax-H3, full-precision vLLM Wan A14B and the optional non-distilled SGLang model on hardware. LightWan NVFP4 has separate pilot evidence.
+- Human quality review, broader screening/confirmation and vLLM startup-warmup reliability; see the [quality pilot](reports/video-quality-2026-10-16.md).
 - Host/daemon outages, runner crashes during active inference and every model-load failure point.
 - Multi-GPU behavior, sustained throughput and measured rollback/deadline guarantees.
 

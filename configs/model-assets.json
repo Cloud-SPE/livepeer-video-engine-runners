@@ -57,6 +57,43 @@
           "minimax_h3_int8.safetensors",
           "minimax_h3_fl2v_turbo_4step_v1.0_768p_bf16.safetensors"
         ]
+      },
+      "lightwan2.2-t2v-a14b-nvfp4": {
+        "repo": "Wan-AI/Wan2.2-T2V-A14B",
+        "revision": "c8c270b13ee05bfa474194ac9fb07a5868a97cea",
+        "storage": "models",
+        "directory": "LightWan2.2-T2V-A14B-NVFP4",
+        "allow_patterns": [
+          "configuration.json",
+          "google/umt5-xxl/*",
+          "high_noise_model/config.json",
+          "low_noise_model/config.json",
+          "models_t5_umt5-xxl-enc-bf16.pth",
+          "Wan2.1_VAE.pth"
+        ],
+        "extra_files": [
+          {
+            "repo": "lightx2v/LightWan2.2-A14B",
+            "revision": "f4b91eba1fd7dc2eb038191e2bca7ed33423032d",
+            "filename": "Wan2.2-T2V-A14B_NVFP4_Sparse_high.safetensors"
+          },
+          {
+            "repo": "lightx2v/LightWan2.2-A14B",
+            "revision": "f4b91eba1fd7dc2eb038191e2bca7ed33423032d",
+            "filename": "Wan2.2-T2V-A14B_NVFP4_Sparse_low.safetensors"
+          }
+        ],
+        "required_files": [
+          "LightWan2.2-T2V-A14B-NVFP4/configuration.json",
+          "LightWan2.2-T2V-A14B-NVFP4/high_noise_model/config.json",
+          "LightWan2.2-T2V-A14B-NVFP4/low_noise_model/config.json",
+          "LightWan2.2-T2V-A14B-NVFP4/google/umt5-xxl/tokenizer_config.json",
+          "LightWan2.2-T2V-A14B-NVFP4/google/umt5-xxl/spiece.model",
+          "LightWan2.2-T2V-A14B-NVFP4/models_t5_umt5-xxl-enc-bf16.pth",
+          "LightWan2.2-T2V-A14B-NVFP4/Wan2.1_VAE.pth",
+          "Wan2.2-T2V-A14B_NVFP4_Sparse_high.safetensors",
+          "Wan2.2-T2V-A14B_NVFP4_Sparse_low.safetensors"
+        ]
       }
     }
   }

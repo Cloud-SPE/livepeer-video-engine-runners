@@ -15,6 +15,10 @@ Run off-the-shelf video generation servers — [LightX2V](https://github.com/Mod
 
 A CPU **stub engine** speaks the same job APIs, so the whole network path runs on a laptop without a GPU.
 
+The optional [quality harness](docs/guides/video-quality.md) generates repeatable
+SDK workloads, evaluates saved clips and builds blind A/B review galleries.
+Quality experiments retain the existing model profiles and deployment defaults.
+
 Use [compose.prod.yml](compose.prod.yml) for a provider connected to your existing orchestrator, or [compose.dev.yml](compose.dev.yml) for a complete free local stack with a CPU test engine. Both use the existing managed lifecycle. Bundled and external modes remain available as advanced recipes. The [deployment guide](docs/guides/container-deployment.md) covers initialization, GPU preparation, persistent volumes and startup. Combined catalogs use engine-prefixed model IDs; per-engine deployments keep the IDs below.
 
 The [node deployment guide](docs/guides/node-deployment.md) explains the two `livepeer/node` roles: orchestrator and remote signer. The Python SDK uses the signer for discovery/payments and calls applications through the orchestrator; no separate traditional gateway process is required.
@@ -47,7 +51,7 @@ The [configuration guide](docs/guides/configuration.md) explains catalog sources
 
 ## Project status
 
-**Experimental.** The three default GPU models have generated real RTX 5090 videos in both delivery modes through the free `livepeer/node` orchestrator. Reports cover [initial generation](docs/validation/reports/gpu-validation-2026-10-15.md) and [832×480 workloads with 12 recovery cases](docs/validation/reports/operations-validation-2026-10-15.md). A [historical paid compatibility trial](docs/validation/reports/paid-validation-2026-10-15.md) used legacy go-livepeer. [Paid single-shot SSE verification](docs/validation/reports/node-paid-validation-2026-10-16.md) now passes for all three defaults through the node orchestrator, local node signer and direct LAN HTTP, without SSH tunnels. Paid persistent delivery remains unvalidated. Larger optional models, public HTTPS, long-duration operation and final settlement remain unvalidated. Test deployments and generated artifacts have been cleaned up; protected wallet/model volumes and key files were preserved.
+**Experimental.** The three default GPU models have generated real RTX 5090 videos in both delivery modes through the free `livepeer/node` orchestrator. Reports cover [initial generation](docs/validation/reports/gpu-validation-2026-10-15.md) and [832×480 workloads with 12 recovery cases](docs/validation/reports/operations-validation-2026-10-15.md). A [historical paid compatibility trial](docs/validation/reports/paid-validation-2026-10-15.md) used legacy go-livepeer. [Paid single-shot SSE verification](docs/validation/reports/node-paid-validation-2026-10-16.md) now passes for all three defaults through the node orchestrator, local node signer and direct LAN HTTP, without SSH tunnels. Paid persistent delivery remains unvalidated. The optional LightWan 2.2 A14B NVFP4 profile also has a [480p/720p SDK pilot](docs/validation/reports/video-quality-2026-10-16.md). Other larger profiles, public HTTPS, long-duration operation and final settlement remain unvalidated. Quality-pilot clips remain private for review; protected wallet/model volumes and key files are preserved.
 
 ## Why this exists
 
@@ -83,17 +87,20 @@ Each engine has a **catalog** in [`models/`](models) listing the models it can s
 |                   |                            | `wan2.2-t2v-a14b`                      | `Wan-AI/Wan2.2-T2V-A14B-Diffusers`                 | MoE 14B; needs a large card or offload        |
 | `lightx2v`        | `/v1/tasks` (LightX2V)     | **`wan2.1-t2v-1.3b`**                  | Local dir `/models/Wan2.1-T2V-1.3B`                | SageAttention 2                               |
 |                   |                            | `minimax-h3-4step`                     | Local `/models/MiniMax-H3` + INT8 DiT + Turbo LoRA | 4-step, block offload; minutes per clip       |
+|                   |                            | `lightwan2.2-t2v-a14b-nvfp4`           | Local Wan 2.2 base + LightWan NVFP4 experts        | 4 trained steps; 480p/720p 5090 pilot         |
 | `stub`            | both (CPU)                 | **`stub-wan-t2v`**, `stub-h3`          | none                                               | Test pattern; `stub-h3` uses the LightX2V API |
 
 Bundled engines download Hugging Face weights into `HF_CACHE_DIR` on first start. Separate deployments default to offline operation and require weights to be staged first. LightX2V entries read local directories under `MODELS_DIR`; see the [weights instructions](docs/guides/container-deployment.md#stage-images-and-pinned-weights), [`models/lightx2v.json`](models/lightx2v.json), and [`configs/lightx2v/`](configs/lightx2v) for the exact paths.
 
 ### Which GPU?
 
-Hardware evidence covers the three **default** models on one RTX 5090. The
+Hardware evidence covers the three **default** models and the optional LightWan
+A14B NVFP4 pilot on one RTX 5090. The
 [workload report](docs/validation/reports/operations-validation-2026-10-15.md)
 records model settings, frame counts, latency and memory; it does not establish
-support for every catalog model or GPU. RTX 4090, larger optional models and
-concurrent multi-GPU deployments still need hardware validation.
+support for every catalog model or GPU. The [quality pilot](docs/validation/reports/video-quality-2026-10-16.md)
+records the larger profile and its narrow 720p VRAM headroom. RTX 4090, other
+optional models and concurrent multi-GPU deployments still need hardware validation.
 
 Use the managed image pins in [`configs/engine-images.json`](configs/engine-images.json)
 with a compatible NVIDIA driver and Container Toolkit. Review host RAM as well
@@ -347,21 +354,21 @@ Environment: `LIVEPEER_BOOTSTRAP_SECRET`, `RUNNER_ADMIN_TOKEN` (empty disables t
 }
 ```
 
-| Key                        | Default   | Meaning                                                                                 |
-| -------------------------- | --------- | --------------------------------------------------------------------------------------- |
-| `id`                       | required  | Model id: lowercase letters, digits, `.` and `-`; appears in app ids                    |
-| `engine`                   | required  | API flavour: `lightx2v` or `openai-videos`                                              |
-| `command`                  | required  | Bundled engine command; separate launch tooling binds it to the private engine network. |
-| `port`                     | required  | Engine port                                                                             |
-| `health_path`              | `/health` | Engine readiness endpoint                                                               |
-| `startup_timeout_s`        | `1800`    | Time allowed for download + load                                                        |
-| `job_timeout_s`            | `1800`    | Per-clip deadline; requests cancellation and recovers an owned backend when needed.     |
-| `price_usd_per_hour`       | `0`       | Advertised for both modes; livepeer-node meters it per second                           |
-| `env`                      | `{}`      | Extra environment for the engine process                                                |
-| `defaults`                 | `{}`      | Job request defaults                                                                    |
-| `served_model`             | empty     | `openai-videos` only: value of the `model` form field, if the server wants one          |
-| `task`                     | empty     | LightX2V request task, including `t2av` for the MiniMax-H3 base variant                 |
-| `supports_negative_prompt` | `true`    | Reject unsupported negative prompts before admission; false for MiniMax-H3              |
+| Key                        | Default   | Meaning                                                                                       |
+| -------------------------- | --------- | --------------------------------------------------------------------------------------------- |
+| `id`                       | required  | Model id: lowercase letters, digits, `.` and `-`; appears in app ids                          |
+| `engine`                   | required  | API flavour: `lightx2v` or `openai-videos`                                                    |
+| `command`                  | required  | Bundled engine command; separate launch tooling binds it to the private engine network.       |
+| `port`                     | required  | Engine port                                                                                   |
+| `health_path`              | `/health` | Engine readiness endpoint                                                                     |
+| `startup_timeout_s`        | `1800`    | Time allowed for download + load                                                              |
+| `job_timeout_s`            | `1800`    | Per-clip deadline; requests cancellation and recovers an owned backend when needed.           |
+| `price_usd_per_hour`       | `0`       | Advertised for both modes; livepeer-node meters it per second                                 |
+| `env`                      | `{}`      | Extra environment for the engine process                                                      |
+| `defaults`                 | `{}`      | Job request defaults                                                                          |
+| `served_model`             | empty     | `openai-videos` only: value of the `model` form field, if the server wants one                |
+| `task`                     | empty     | LightX2V request task, including `t2av` for the MiniMax-H3 base variant                       |
+| `supports_negative_prompt` | `true`    | Reject unsupported negative prompts before admission; false for MiniMax-H3 and LightWan NVFP4 |
 
 ### Client (`video-client`)
 
@@ -470,7 +477,7 @@ Add an entry to the engine's catalog, with defaults the model supports, and run 
 
 ## Known issues and limitations
 
-- **Limited hardware coverage.** The three default models pass 832×480 workloads and selected recovery cases on one RTX 5090. Paid persistent delivery with the node signer, larger models, host/daemon outages, long-duration operation and settlement remain unvalidated. See the [workload report](docs/validation/reports/operations-validation-2026-10-15.md).
+- **Limited hardware coverage.** The three default models pass 832×480 workloads and selected recovery cases on one RTX 5090. LightWan A14B NVFP4 also passed a narrow 480p/720p pilot. Paid persistent delivery with the node signer, other larger models, host/daemon outages, long-duration operation and settlement remain unvalidated. See the [workload report](docs/validation/reports/operations-validation-2026-10-15.md).
 - **Trickle publishing bypasses the SDK publisher.** `livepeer-gateway`'s `TricklePublisher` opens each segment's upload before it has data, but aiohttp sends request headers only with the first body byte; livepeer-node then times the idle connection out (5 s new / 90 s reused) and the next message or clip is lost. The runner sends each segment as one complete request instead (`ChannelPublisher` in `src/video_runners/runner/delivery.py`). Worth fixing upstream in the SDK.
 - **One job per GPU.** No batching across requests; each runner advertises capacity 1 per mode.
 - **Admission is per runner.** Managed controllers sharing the GPU lease volume exclude duplicate assignments. Bundled/external deployments and unrelated GPU processes do not participate in that lease; operators must prevent GPU sharing.
