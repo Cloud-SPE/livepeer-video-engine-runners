@@ -1,0 +1,98 @@
+# Operator-owned engine. Select EXTERNAL_ENGINE_IMAGE; optional --profile local-orchestrator.
+services:
+  orchestrator:
+    profiles: [local-orchestrator]
+    restart: unless-stopped
+    extends:
+      file: compose.dev.yml
+      service: orchestrator
+  runner:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/docker/cpu.Dockerfile
+      target: runner
+    image: livepeer-video-runner:local
+    command:
+      - --lifecycle=external
+      - --engine-url=http://engine:9100
+      - --host=0.0.0.0
+      - --catalog=models/${ENGINE:-sglang}.json
+      - --model=${MODEL:-}
+      - --orchestrator=${ORCHESTRATOR_URL:-http://orchestrator:8935}
+      - --runner-url=${RUNNER_URL:-http://${SUBNET_PREFIX:-172.30.88}.10:8989}
+      - --admin-host=0.0.0.0
+      - --delivery=${DELIVERY:-both}
+    environment:
+      LIVEPEER_BOOTSTRAP_SECRET: ${BOOTSTRAP_SECRET:-devsecret}
+      RUNNER_ADMIN_TOKEN: ${RUNNER_ADMIN_TOKEN:-change-me}
+    volumes:
+      - ${PUBLIC_MODEL_CATALOG:-./models/${ENGINE:-sglang}.json}:/app/models/${ENGINE:-sglang}.json:ro
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+        required: false
+      engine:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${RUNNER_ADMIN_PORT:-8990}:8990"
+      - "${RUNNER_BIND_HOST:-127.0.0.1}:${RUNNER_PORT:-8989}:8989"
+    healthcheck:
+      test:
+        [
+          CMD,
+          python,
+          -c,
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8989/healthz', timeout=3)",
+        ]
+      interval: 3s
+      timeout: 4s
+      retries: 3
+      start_period: 60m
+      start_interval: 2s
+    networks:
+      default:
+        ipv4_address: ${SUBNET_PREFIX:-172.30.88}.10
+      engine: {}
+  engine:
+    image: ${EXTERNAL_ENGINE_IMAGE:-lmsysorg/sglang@sha256:b1259f3ea3275f66237c498ea388919729018bc9f01c3d638391e06e2cf3f469}
+    entrypoint: [python3, /app/engine_entrypoint.py]
+    command: [--catalog, /app/model-catalog.json, --model, "${MODEL:-}"]
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+      - engine-cache:/cache
+      - model-weights:/models:ro
+      - ./src/video_runners/tools/engine_entrypoint.py:/app/engine_entrypoint.py:ro
+      - ${PUBLIC_MODEL_CATALOG:-./models/${ENGINE:-sglang}.json}:/app/model-catalog.json:ro
+    working_dir: /app
+    shm_size: 8gb
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_HUB_OFFLINE: ${ENGINE_OFFLINE:-1}
+      TRANSFORMERS_OFFLINE: ${ENGINE_OFFLINE:-1}
+      TORCH_HOME: /cache/${ENGINE:-sglang}/torch
+      TORCHINDUCTOR_CACHE_DIR: /cache/${ENGINE:-sglang}/torchinductor
+      TRITON_CACHE_DIR: /cache/${ENGINE:-sglang}/triton
+      CUDA_CACHE_PATH: /cache/${ENGINE:-sglang}/cuda
+      VLLM_CACHE_ROOT: /cache/${ENGINE:-sglang}/vllm
+    restart: unless-stopped
+    networks: [engine]
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${SUBNET_PREFIX:-172.30.88}.0/24
+  engine:
+    ipam:
+      config:
+        - subnet: ${ENGINE_SUBNET_PREFIX:-172.30.90}.0/24
+volumes:
+  engine-cache:
+    external: true
+    name: ${ENGINE_CACHE_VOLUME:-livepeer-video-engine-cache}
+  hf-cache:
+    external: true
+    name: ${HF_CACHE_VOLUME:-livepeer-video-hf-cache}
+  model-weights:
+    external: true
+    name: ${MODELS_VOLUME:-livepeer-video-model-weights}

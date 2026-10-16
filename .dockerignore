@@ -1,9 +1,14 @@
 .git
 .github
 .venv
+.idea
+dist
 .ruff_cache
 **/__pycache__
 .env
+.env.*
+.engine-images.env
 weights
+artifacts
 tests
 *.mp4

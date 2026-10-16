@@ -1,0 +1,22 @@
+# livepeer/node signer, matching the source pin in deploy/compose/signer.yml.
+# Copy to a private settings directory and review before starting.
+DataDir = "/var/lib/livepeer/signer"
+Network = "arbitrum-one-mainnet"
+Listen = "127.0.0.1:8937"
+MetricsListen = "127.0.0.1:8938"
+KeystoreFile = "/run/secrets/signer-keystore.json"
+KeystorePasswordFile = "/run/secrets/signer-password"
+RPCURLFile = "/run/secrets/signer-rpc-url"
+
+# Documentation-only address: replace URL and grant with the reachable private
+# LAN/VPN orchestrator address. No SSH tunnel is required.
+Orchestrators = ["http://192.0.2.10:8935"]
+DiscoveryGrants = ["192.0.2.10:8935"]
+
+# Example test rate ceilings in USD; these are not total spending budgets.
+MaxHourlyPrice = "2"
+MaxFixedPrice = "1"
+ETHUSDMaxAge = "2h"
+MaxTicketEV = "3000000000000"
+MaxBatchEV = "20000000000000"
+DepositMultiplier = 1

@@ -1,0 +1,6 @@
+{
+  "sglang": "lmsysorg/sglang@sha256:b1259f3ea3275f66237c498ea388919729018bc9f01c3d638391e06e2cf3f469",
+  "vllm-omni": "vllm/vllm-omni@sha256:5cba1538c6f8ee81e8bea6708c24e68d7b2640f466a9fbf2ef15e68f2168b48b",
+  "lightx2v_base": "lightx2v/lightx2v@sha256:fdfebaded08f8d68f1ea86e19d3f8804206479a82076ef12dba414f58a452761",
+  "lightx2v_commit": "8e86555809efd20138d3a4e1f937ee306cdf0ee0"
+}

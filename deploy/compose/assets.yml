@@ -1,0 +1,24 @@
+# CPU-only model preparation. External volumes survive container/stack removal.
+services:
+  model-tools:
+    build:
+      context: .
+      dockerfile: deploy/docker/cpu.Dockerfile
+      target: model-tools
+    image: livepeer-video-model-tools:local
+    runtime: runc
+    network_mode: bridge
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - hf-cache:/cache
+      - model-weights:/models
+volumes:
+  hf-cache:
+    external: true
+    name: ${HF_CACHE_VOLUME:-livepeer-video-hf-cache}
+  model-weights:
+    external: true
+    name: ${MODELS_VOLUME:-livepeer-video-model-weights}

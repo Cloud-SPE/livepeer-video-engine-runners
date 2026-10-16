@@ -1,0 +1,177 @@
+# Complete free development stack; ENGINE=stub needs no GPU, keys or weights.
+services:
+  orchestrator:
+    # Built with livepeer-node's own Dockerfile straight from its git repository,
+    # pinned to a commit for a reproducible local build.
+    build:
+      context: ${LIVEPEER_NODE_SOURCE:-https://github.com/livepeer/node.git#08081dbda0f4f7b56e362e3af4b6965bfa1b73a4}
+      dockerfile: docker/Dockerfile
+    image: livepeer-node:local
+    # Two addresses:
+    #   service-url         advertised to clients in discovery and channel URLs,
+    #                       so it must be reachable from the host (published port).
+    #   runner-service-url  where the runner heartbeats and publishes trickle,
+    #                       so it must resolve on the compose network.
+    # The runner has a private address, so it needs a grant, and grants take
+    # only IPs: the runner gets a fixed one on this project's network.
+    command:
+      - orchestrator
+      - --config=
+      - --listen=0.0.0.0:8935
+      - --service-url=http://127.0.0.1:${ORCHESTRATOR_PORT:-8935}
+      - --runner-service-url=http://orchestrator:8935
+      - --runner-grants=${SUBNET_PREFIX:-172.30.88}.10:8989
+    environment:
+      LIVEPEER_ORCHESTRATOR_BOOTSTRAP_SECRET: ${BOOTSTRAP_SECRET:-devsecret}
+    ports:
+      - "127.0.0.1:${ORCHESTRATOR_PORT:-8935}:8935"
+    # The image has no HTTP client; bash's /dev/tcp asks the loopback-only
+    # metrics listener for readiness.
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - exec 3<>/dev/tcp/127.0.0.1/8936 && printf 'GET /readyz HTTP/1.0\r\n\r\n' >&3 && grep -q ready <&3
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 5s
+
+  runner:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/docker/cpu.Dockerfile
+      target: runner
+    image: livepeer-video-runner:local
+    command:
+      - --lifecycle=managed
+      - --host=0.0.0.0
+      - --catalog=models/${ENGINE:-stub}.json
+      - --model=${MODEL:-}
+      - --controller-url=http://controller-control:9200
+      - --orchestrator=${ORCHESTRATOR_URL:-http://orchestrator:8935}
+      - --runner-url=${RUNNER_URL:-http://${SUBNET_PREFIX:-172.30.88}.10:8989}
+      - --admin-host=0.0.0.0
+      - --delivery=${DELIVERY:-both}
+    environment:
+      LIVEPEER_BOOTSTRAP_SECRET: ${BOOTSTRAP_SECRET:-devsecret}
+      RUNNER_ADMIN_TOKEN: ${RUNNER_ADMIN_TOKEN:-change-me}
+      ENGINE_CONTROLLER_TOKEN: ${ENGINE_CONTROLLER_TOKEN:?Generate a controller token with openssl rand -hex 32}
+    volumes:
+      - ${PUBLIC_MODEL_CATALOG:-./models/${ENGINE:-stub}.json}:/app/models/${ENGINE:-stub}.json:ro
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+      controller:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${RUNNER_ADMIN_PORT:-8990}:8990"
+    healthcheck:
+      test:
+        [
+          CMD,
+          python,
+          -c,
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8989/healthz', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 60m
+      start_interval: 2s
+    networks:
+      default:
+        ipv4_address: ${SUBNET_PREFIX:-172.30.88}.10
+      engine: {}
+      control: {}
+  controller:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/docker/cpu.Dockerfile
+      target: controller
+    image: livepeer-video-controller:local
+    command:
+      - --catalog=/config/catalog.json
+      - --host=${CONTROL_SUBNET_PREFIX:-172.30.89}.20
+    environment:
+      ENGINE_CONTROLLER_TOKEN: ${ENGINE_CONTROLLER_TOKEN}
+      ENGINE_NAMESPACE: ${ENGINE_NAMESPACE:-${COMPOSE_PROJECT_NAME:-video-engines}}
+      ENGINE_NETWORK: ${ENGINE_NETWORK:-${COMPOSE_PROJECT_NAME:-video-engines}-engine}
+      ENGINE_GPU_UUID: ${ENGINE_GPU_UUID:-}
+      HF_CACHE_VOLUME: ${HF_CACHE_VOLUME:-livepeer-video-hf-cache}
+      MODELS_VOLUME: ${MODELS_VOLUME:-livepeer-video-model-weights}
+      ENGINE_CACHE_VOLUME: ${ENGINE_CACHE_VOLUME:-livepeer-video-engine-cache}
+      LIGHTX2V_ENGINE_IMAGE: ${LIGHTX2V_ENGINE_IMAGE:-}
+    volumes:
+      - ${ENGINE_CONTROLLER_CATALOG:-./configs/controller/${ENGINE:-stub}.json}:/config/catalog.json:ro
+      - controller-state:/state
+      - gpu-leases:/leases
+    depends_on:
+      engine-image:
+        condition: service_completed_successfully
+      socket-proxy:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          CMD,
+          python,
+          -c,
+          "import os, urllib.request; urllib.request.urlopen('http://${CONTROL_SUBNET_PREFIX:-172.30.89}.20:9200/healthz', timeout=3)",
+        ]
+      interval: 3s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+    networks:
+      control:
+        ipv4_address: ${CONTROL_SUBNET_PREFIX:-172.30.89}.20
+        aliases: [controller-control]
+      engine: {}
+      docker-api: {}
+  socket-proxy:
+    restart: unless-stopped
+    image: ghcr.io/tecnativa/docker-socket-proxy@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - ./configs/docker-socket-proxy.cfg:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    networks: [docker-api]
+  engine-image:
+    # Build the CPU fixture before controller startup; this container exits immediately.
+    entrypoint: [/bin/true]
+    restart: "no"
+    build:
+      context: .
+      dockerfile: deploy/docker/cpu.Dockerfile
+      target: stub-engine
+    image: livepeer-video-stub-engine:local
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${SUBNET_PREFIX:-172.30.88}.0/24
+  control:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${CONTROL_SUBNET_PREFIX:-172.30.89}.0/24
+  engine:
+    ipam:
+      config:
+        - subnet: ${ENGINE_SUBNET_PREFIX:-172.30.90}.0/24
+    name: ${ENGINE_NETWORK:-${COMPOSE_PROJECT_NAME:-video-engines}-engine}
+  docker-api:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${DOCKER_API_SUBNET_PREFIX:-172.30.91}.0/24
+volumes:
+  controller-state:
+    external: true
+    name: ${CONTROLLER_STATE_VOLUME:-${COMPOSE_PROJECT_NAME:-video-engines}-controller-state}
+  gpu-leases:
+    external: true
+    name: ${GPU_LEASE_VOLUME:-livepeer-video-gpu-leases}

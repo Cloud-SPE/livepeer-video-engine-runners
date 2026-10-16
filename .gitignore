@@ -1,7 +1,14 @@
 .env
+.env.*
+!.env.example
 .venv/
 weights/
 *.mp4
 __pycache__/
 .ruff_cache/
 .pytest_cache/
+.engine-images.env
+/artifacts/gpu-validation/
+/artifacts/cpu-validation/
+/.idea/
+/dist/

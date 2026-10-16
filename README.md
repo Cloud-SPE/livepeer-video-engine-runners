@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Orchestrator: livepeer-node](https://img.shields.io/badge/orchestrator-livepeer--node-00A86B)](https://github.com/livepeer/node)
-[![Docker Compose](https://img.shields.io/badge/deploy-docker%20compose-2496ED?logo=docker&logoColor=white)](compose.yml)
+[![Docker Compose](https://img.shields.io/badge/deploy-docker%20compose-2496ED?logo=docker&logoColor=white)](compose.dev.yml)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -14,6 +14,14 @@
 Run off-the-shelf video generation servers — [LightX2V](https://github.com/ModelTC/LightX2V), [SGLang Diffusion](https://docs.sglang.io/diffusion/installation.html) and [vLLM-Omni](https://docs.vllm.ai/projects/vllm-omni/en/latest/serving/videos_api/) — as **Livepeer live runners**. One runner process per GPU starts an engine, registers it with a [livepeer-node](https://github.com/livepeer/node) orchestrator, and sells text-to-video on the network two ways: a **single call** that streams the clip back over Server-Sent Events, or a **held session** that renders clip after clip into trickle channels. Operators switch the served model at runtime without touching the orchestrator.
 
 A CPU **stub engine** speaks the same job APIs, so the whole network path runs on a laptop without a GPU.
+
+Use [compose.prod.yml](compose.prod.yml) for a provider connected to your existing orchestrator, or [compose.dev.yml](compose.dev.yml) for a complete free local stack with a CPU test engine. Both use the existing managed lifecycle. Bundled and external modes remain available as advanced recipes. The [deployment guide](docs/guides/container-deployment.md) covers initialization, GPU preparation, persistent volumes and startup. Combined catalogs use engine-prefixed model IDs; per-engine deployments keep the IDs below.
+
+The [node deployment guide](docs/guides/node-deployment.md) explains the two `livepeer/node` roles: orchestrator and remote signer. The Python SDK uses the signer for discovery/payments and calls applications through the orchestrator; no separate traditional gateway process is required.
+
+For contributors, start with the [repository map](AGENTS.md), [current architecture](ARCHITECTURE.md) and [documentation index](docs/index.md). Run `scripts/check.sh` for fast local verification; the [validation matrix](docs/validation/index.md) distinguishes automated contracts, recorded hardware results and pending checks.
+
+The [configuration guide](docs/guides/configuration.md) explains catalog sources, pin checks and regeneration. Python options and public fields are listed in the [generated reference](docs/reference/configuration.md).
 
 ## Contents
 
@@ -39,7 +47,7 @@ A CPU **stub engine** speaks the same job APIs, so the whole network path runs o
 
 ## Project status
 
-**Experimental.** Everything below is tested end to end with the stub engine against livepeer-node (unit tests, and CI runs the full network path on every change). **None of the three GPU engines has been run through the runner on a GPU yet.** The engine clients follow each project's documented API and current source (LightX2V `8e86555`, SGLang `3b72b70`), but expect to adjust catalog flags, image tags and request defaults on the first GPU runs. [GPU validation reports](.github/ISSUE_TEMPLATE/engine_or_model.yml) are the most useful contribution right now.
+**Experimental.** The three default GPU models have generated real RTX 5090 videos in both delivery modes through the free `livepeer/node` orchestrator. Reports cover [initial generation](docs/validation/reports/gpu-validation-2026-10-15.md) and [832×480 workloads with 12 recovery cases](docs/validation/reports/operations-validation-2026-10-15.md). A [historical paid compatibility trial](docs/validation/reports/paid-validation-2026-10-15.md) used legacy go-livepeer. [Paid single-shot SSE verification](docs/validation/reports/node-paid-validation-2026-10-16.md) now passes for all three defaults through the node orchestrator, local node signer and direct LAN HTTP, without SSH tunnels. Paid persistent delivery remains unvalidated. Larger optional models, public HTTPS, long-duration operation and final settlement remain unvalidated. Test deployments and generated artifacts have been cleaned up; protected wallet/model volumes and key files were preserved.
 
 ## Why this exists
 
@@ -57,11 +65,11 @@ This repository is the adapter: one small runner that hides the engine's job API
 
 - **Three engines, one interface** — LightX2V, SGLang Diffusion, vLLM-Omni, plus a CPU stub. Adding an engine with an async job API is one small class.
 - **Two delivery modes from one GPU** — single-shot over SSE and persistent sessions over trickle, registered side by side and sharing one GPU lock.
-- **Billing that matches the work** — metered per second for as long as the clip renders (single-shot) or the session is held (persistent). Busy requests are refused immediately, not queued while billed.
+- **Billing that matches the work** — metered while a single-shot stream or persistent reservation remains open. Busy rejection avoids a render queue; upfront charges and reserved-session time can still apply.
 - **Runtime model switching** — an authenticated admin endpoint drains the GPU, deregisters, restarts the engine with another catalog model, re-registers, and rolls back if the new model fails to load.
-- **Safe failure** — a client that disconnects cancels the engine job; abandoned sessions are released after an idle timeout; `SIGTERM` stops the engine's whole process group and deregisters.
-- **Large clips** — MP4s are split into 8 MB trickle segments (single-shot: 512 KB base64 SSE chunks) with a SHA-256 the client verifies.
-- **Reproducible** — the orchestrator is built from a pinned livepeer-node commit; runner dependencies install from `uv.lock`; engine images and sources are pinned.
+- **Safe failure** — disconnects request cancellation; uncertain work resets an owned engine before readmission. External engines require operator recovery. Idle sessions expire, and graceful shutdown deregisters and stops owned engines.
+- **Large clips** — MP4s are split into 8 MiB trickle segments (single-shot: 256 KiB binary chunks encoded as base64 SSE) with a SHA-256 the client verifies.
+- **Reproducible managed deployment** — node source, managed engine images, weight revisions and dependencies are pinned. Bundled Dockerfiles retain configurable base-image arguments; pin those before deployment.
 
 ## Engines and models
 
@@ -71,82 +79,69 @@ Each engine has a **catalog** in [`models/`](models) listing the models it can s
 | ----------------- | -------------------------- | -------------------------------------- | -------------------------------------------------- | --------------------------------------------- |
 | `sglang`          | `/v1/videos` (OpenAI-like) | **`fastwan2.1-t2v-1.3b`**              | `FastVideo/FastWan2.1-T2V-1.3B-Diffusers`          | Distilled, 3 steps                            |
 |                   |                            | `wan2.1-t2v-1.3b`                      | `Wan-AI/Wan2.1-T2V-1.3B-Diffusers`                 | 30 steps, text encoder offloaded to CPU       |
-| `vllm-omni`       | `/v1/videos` (OpenAI-like) | **`wan2.2-ti2v-5b`**                   | `Wan-AI/Wan2.2-TI2V-5B-Diffusers`                  | 24 fps                                        |
+| `vllm-omni`       | `/v1/videos` (OpenAI-like) | **`wan2.2-ti2v-5b`**                   | `Wan-AI/Wan2.2-TI2V-5B-Diffusers`                  | 24 fps; CPU offload + VAE tiling              |
 |                   |                            | `wan2.2-t2v-a14b`                      | `Wan-AI/Wan2.2-T2V-A14B-Diffusers`                 | MoE 14B; needs a large card or offload        |
 | `lightx2v`        | `/v1/tasks` (LightX2V)     | **`wan2.1-t2v-1.3b`**                  | Local dir `/models/Wan2.1-T2V-1.3B`                | SageAttention 2                               |
 |                   |                            | `minimax-h3-4step`                     | Local `/models/MiniMax-H3` + INT8 DiT + Turbo LoRA | 4-step, block offload; minutes per clip       |
 | `stub`            | both (CPU)                 | **`stub-wan-t2v`**, `stub-h3`          | none                                               | Test pattern; `stub-h3` uses the LightX2V API |
 
-Weights from Hugging Face download into `HF_CACHE_DIR` on first start. LightX2V entries read local directories under `MODELS_DIR`; see [`models/lightx2v.json`](models/lightx2v.json) and [`configs/lightx2v/`](configs/lightx2v) for the exact paths.
+Bundled engines download Hugging Face weights into `HF_CACHE_DIR` on first start. Separate deployments default to offline operation and require weights to be staged first. LightX2V entries read local directories under `MODELS_DIR`; see the [weights instructions](docs/guides/container-deployment.md#stage-images-and-pinned-weights), [`models/lightx2v.json`](models/lightx2v.json), and [`configs/lightx2v/`](configs/lightx2v) for the exact paths.
 
 ### Which GPU?
 
-These are **expectations from the upstream projects, not measurements from this repository** — please [report yours](.github/ISSUE_TEMPLATE/engine_or_model.yml).
+Hardware evidence covers the three **default** models on one RTX 5090. The
+[workload report](docs/validation/reports/operations-validation-2026-10-15.md)
+records model settings, frame counts, latency and memory; it does not establish
+support for every catalog model or GPU. RTX 4090, larger optional models and
+concurrent multi-GPU deployments still need hardware validation.
 
-| Model                          | RTX 4090 (24 GB)                                   | RTX 5090 (32 GB)           |
-| ------------------------------ | -------------------------------------------------- | -------------------------- |
-| Wan2.1 T2V 1.3B / FastWan 1.3B | Fits comfortably (upstream quotes ~8 GB at 480p)   | Fits                       |
-| Wan2.2 TI2V 5B                 | Fits with offload; upstream targets consumer cards | Fits                       |
-| Wan2.2 T2V A14B                | Only with aggressive offload; slow                 | Tight; offload likely      |
-| MiniMax-H3 4-step (LightX2V)   | INT8 + block offload; minutes per clip             | Same config; more headroom |
-
-Blackwell (RTX 50) cards need CUDA 12.8+ builds; pick a matching base image (see [Build](#build)). LightX2V's stock FlashAttention 3 configs are Hopper-only, which is why the shipped configs use SageAttention 2.
+Use the managed image pins in [`configs/engine-images.json`](configs/engine-images.json)
+with a compatible NVIDIA driver and Container Toolkit. Review host RAM as well
+as VRAM: the trusted SGLang profile allows 48 GiB of host memory. Bundled image
+base arguments remain operator-selected and require separate pinning and checks.
 
 ## Quick start (no GPU)
 
-Requirements: Docker with Compose v2, [uv](https://docs.astral.sh/uv/), and network access to GitHub (the orchestrator is built from source).
+Requirements: Docker Compose 2.24.4+, Python 3.12+, [uv](https://docs.astral.sh/uv/), and network access for the pinned node build.
 
 ```sh
 git clone https://github.com/Cloud-SPE/livepeer-video-engine-runners.git
 cd livepeer-video-engine-runners
-
-ENGINE=stub docker compose up -d --build --wait     # orchestrator + runner with the stub engine
-uv run client.py --list                              # both apps registered
-uv run client.py --output fox                        # single-shot  -> fox.mp4
-uv run client.py --mode persistent --clips 3 --output fox   # session -> fox-000.mp4 ... fox-002.mp4
-
-# switch the served model at runtime
-curl -X POST -H "Authorization: Bearer change-me" \
-  http://127.0.0.1:8990/admin/model -d '{"model": "stub-h3"}'
-uv run client.py --model stub-h3 --output h3
-
-scripts/e2e.sh                                       # the same checks CI runs
-docker compose down
+uv sync --locked
+mkdir -p "$HOME/.config/livepeer-video"
+VIDEO_ENV="$HOME/.config/livepeer-video/dev.env"
+python3 src/video_runners/tools/init_deployment.py --engine stub \
+  --project video-dev --env-file "$VIDEO_ENV"
+docker compose --env-file "$VIDEO_ENV" -f compose.dev.yml up -d --build --wait
+uv run video-client --list
+uv run video-client --output fox
+uv run video-client --mode persistent --clips 3 --output fox-session
+# Stop the runner first so its controller-managed engine is deactivated.
+docker compose --env-file "$VIDEO_ENV" -f compose.dev.yml stop -t 150 runner
+docker compose --env-file "$VIDEO_ENV" -f compose.dev.yml down
 ```
 
-The first build compiles livepeer-node, which takes a few minutes.
+The first build compiles the pinned node source. The initializer creates random credentials, available ports/subnets and external volumes without overwriting an existing env file. If port 8935 was occupied, pass the generated `ORCHESTRATOR_PORT` as `--discovery http://127.0.0.1:PORT/discovery` to the client. The free stack needs no keys, GPU or model downloads. See the [deployment guide](docs/guides/container-deployment.md) for GPU and production startup; use `tests/e2e/managed.sh` for an isolated, self-cleaning integration run.
 
 ## Architecture
 
+The everyday stacks use a CPU runner and controller with a separate engine container, controlled through the private Docker socket proxy. Production connects to your existing orchestrator; development starts a local free node. The runner CLI still supports bundled child-process and external engine ownership. Runtime defaults and both delivery modes remain unchanged.
+
 ```mermaid
 flowchart LR
-  client["client<br/>(livepeer-gateway SDK)"]
-  orch["livepeer-node<br/>orchestrator"]
-  subgraph container["runner container — one GPU"]
-    runner["runner.py<br/>SSE + trickle adapter<br/>GPU lock · admin API"]
-    engine["engine child process<br/>LightX2V · SGLang · vLLM-Omni · stub"]
-  end
-  operator["operator"]
-  client -->|"discovery, /generate (SSE),<br/>/session/start, /session/jobs"| orch
-  orch -->|proxy| runner
-  runner -->|"job API on 127.0.0.1:9100"| engine
-  runner -.->|"register ×2, heartbeats,<br/>trickle publish"| orch
-  client -.->|"trickle subscribe"| orch
-  operator -->|"admin :8990 (not proxied)"| runner
+  client[Python SDK client] --> orch[livepeer/node orchestrator]
+  client -.-> signer[Optional node signer]
+  orch --> runner[CPU runner]
+  runner --> engine[Separate engine container]
+  runner --> controller[CPU controller]
+  controller --> proxy[Private socket proxy]
+  proxy --> docker[Docker daemon]
+  docker --> engine
 ```
 
 ### Components
 
-| File                               | Role                                                                                                                                                                                                                           |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`engines.py`](engines.py)         | The catalog (`ModelSpec`), engine clients (`LightX2VClient`, `OpenAIVideosClient`) behind one `EngineClient.run()` = submit → poll → fetch, and the `EngineSupervisor` that runs the engine. **Knows nothing about Livepeer.** |
-| [`runner.py`](runner.py)           | The only Livepeer-aware server code: registration, both delivery modes, GPU admission, sessions, the admin API. Grep `# Livepeer:` for the SDK calls.                                                                          |
-| [`client.py`](client.py)           | Reference client for both modes, built on the `livepeer-gateway` SDK. Grep `# Livepeer:`.                                                                                                                                      |
-| [`stub_engine.py`](stub_engine.py) | CPU stand-in for both engine APIs; renders a colour-bar MP4 after a delay.                                                                                                                                                     |
-| [`models/`](models)                | One catalog per engine.                                                                                                                                                                                                        |
-| [`configs/`](configs)              | Engine-side configs referenced by catalog commands (LightX2V JSON configs).                                                                                                                                                    |
-| [`docker/`](docker)                | One image per engine: the engine's official image plus an isolated Python 3.12 runner environment in `/opt/runner`.                                                                                                            |
-| [`compose.yml`](compose.yml)       | Orchestrator (built from livepeer-node source) + runner on a private network. [`compose.gpu.yml`](compose.gpu.yml) adds one NVIDIA GPU.                                                                                        |
+The implementation lives in [src/video_runners/](src/video_runners). Use the installed runtime commands and real paths; root forwarding modules and symlink aliases have been removed. The [architecture map](ARCHITECTURE.md) explains boundaries, and the [layout guide](docs/guides/repository-layout.md) maps old commands to their replacements.
 
 ### Single-shot: one call, Server-Sent Events back
 
@@ -170,7 +165,7 @@ sequenceDiagram
   Note over C,O: metered per second while the stream is open
 ```
 
-Headers leave before the engine starts, so a job of any length meets the 60-second header timeout, and the open stream keeps the call billed. If the client disconnects, the runner cancels the engine job.
+Headers leave before the engine starts, satisfying the header deadline while the open stream keeps the call billed. If the client disconnects, the runner requests cancellation and resets an owned engine when its idle state cannot be established.
 
 ### Persistent: hold a session, render many clips
 
@@ -193,17 +188,17 @@ sequenceDiagram
     R->>E: submit, poll
     R->>O: events: status ...
     R->>O: events: video {segments: n, sha256}
-    R->>O: video: n segments of ≤ 8 MB
+    R->>O: video: n segments of ≤ 8 MiB
     R->>O: events: done
   end
-  C->>O: stop session (settles payment)
+  C->>O: stop session (ends metering)
 ```
 
 The client reads the video channel continuously (livepeer-node keeps only the last five segments per channel) and assembles each clip from the number of segments its `video` event announces. While a session is open, the runner writes an empty segment to any channel that has been quiet for 60 seconds, because livepeer-node closes a trickle channel after five minutes without a write — shorter than a long render.
 
 ### GPU admission
 
-Both modes share one `asyncio.Lock`. With `--busy reject` (default) a request that finds the GPU busy is refused immediately — `503` for single-shot, `409` for a persistent job — so nobody is billed for waiting. The orchestrator also hides a full runner from discovery, so a second caller of the _same_ mode sees `No runners available`. `--busy wait` queues instead (and bills the waiting caller).
+Both modes share one `asyncio.Lock`. With `--busy reject` (default), busy work is refused immediately — `503` for single-shot, `409` for a persistent job — without entering a render queue. Paid callers can still incur the orchestrator's upfront minimum before the runner refuses them. A persistent reservation also remains billable until released. The orchestrator hides a full app from discovery, so a second caller of the same mode can see `No runners available`. `--busy wait` queues instead and bills waiting time.
 
 ### Model switching
 
@@ -222,7 +217,7 @@ While switching, new requests are refused. Switching takes as long as the new mo
 
 ### Engine supervision
 
-The engine runs as a child process in its **own process group**, listening only on `127.0.0.1:9100` inside the container. The runner registers only after the engine's health endpoint answers, keeps the last 40 lines of engine output for error messages, and on stop sends `SIGTERM` to the whole group (then `SIGKILL` after 30 s), so multi-process engines leave nothing behind.
+In bundled mode the engine runs in its own process group on loopback. The supervisor keeps the last 40 log lines and sends `SIGTERM`, followed by `SIGKILL` after 30 seconds if needed. Managed mode delegates container creation, readiness and shutdown to the controller. External mode monitors a separately owned backend and leaves its lifecycle to the operator. Registration follows readiness in every mode.
 
 ## Network API
 
@@ -235,21 +230,21 @@ App ids follow the Cloud SPE capability convention, `<domain>:<capability>`, wit
 | single-shot | `video:generations/<model id>` | `POST /generate`                       |
 | persistent  | `video:sessions/<model id>`    | `POST /session/start`, `/session/jobs` |
 
-The capability names the runner's endpoint family, the way `openai:images-generations` names `/v1/images/generations`. Model ids name the **model, not the engine**: the same model served by two engines is one offering, and discovery's `version` field reports the engine. App ids, endpoints and event shapes are a public contract; changing them is a breaking change.
+The capability names the runner's endpoint family, the way `openai:images-generations` names `/v1/images/generations`. Per-engine catalogs use upstream-style model IDs. The combined catalog prefixes IDs with `sglang-`, `lightx2v-` or `vllm-omni-`, so those engine offerings have distinct app IDs. Discovery's `version` field reports the API adapter (`openai-videos` or `lightx2v`), not the engine product or release. App ids, endpoints and event shapes are a public contract; changing them is a breaking change.
 
 ### Job request
 
-Both `/generate` and `/session/jobs` take the same JSON body (at most 64 KB). Omitted fields fall back to the model's catalog `defaults`.
+Both `/generate` and `/session/jobs` take the same JSON object (at most 64 KiB). Omitted fields fall back to the model's catalog `defaults`.
 
-| Field             | Type   | Notes                                                           |
-| ----------------- | ------ | --------------------------------------------------------------- |
-| `prompt`          | string | Required, 1–4000 characters                                     |
-| `negative_prompt` | string |                                                                 |
-| `width`, `height` | int    | Must be a resolution the model supports                         |
-| `num_frames`      | int    | Must be a frame count the model supports (Wan: 4n+1)            |
-| `fps`             | int    | OpenAI-style engines only                                       |
-| `steps`           | int    | OpenAI-style engines only; LightX2V reads steps from its config |
-| `seed`            | int    |                                                                 |
+| Field             | Type   | Notes                                                                 |
+| ----------------- | ------ | --------------------------------------------------------------------- |
+| `prompt`          | string | Required, 1–4000 characters                                           |
+| `negative_prompt` | string |                                                                       |
+| `width`, `height` | int    | Non-negative integers; choose a resolution the backend model supports |
+| `num_frames`      | int    | Non-negative integer; backend-specific frame rules still apply        |
+| `fps`             | int    | OpenAI-style engines only                                             |
+| `steps`           | int    | OpenAI-style engines only; LightX2V reads steps from its config       |
+| `seed`            | int    |                                                                       |
 
 ### Single-shot events (`text/event-stream`)
 
@@ -257,13 +252,13 @@ Both `/generate` and `/session/jobs` take the same JSON body (at most 64 KB). Om
 event: accepted     data: {"model": "fastwan2.1-t2v-1.3b"}
 event: status       data: {"state": "running", "progress": 40}
 : keepalive
-event: video-start  data: {"content_type": "video/mp4", "bytes": 1549994, "sha256": "…", "chunks": 3}
-event: video        data: {"index": 0, "b64": "…"}           # 512 KB of MP4 per event
+event: video-start  data: {"content_type": "video/mp4", "bytes": 786432, "sha256": "…", "chunks": 3}
+event: video        data: {"index": 0, "b64": "…"}           # up to 256 KiB of MP4 per event
 event: done         data: {}
 event: error        data: {"message": "…"}                   # instead of video/done
 ```
 
-`state` is one of `queued`, `running`, `completed`, `failed`, `cancelled`; `progress` (0–100) is present when the engine reports it.
+`state` is one of `queued`, `running`, `completed`, `failed`, `cancelled`; `progress` is a percentage when the engine reports it, otherwise `null`.
 
 ### Persistent session
 
@@ -282,42 +277,34 @@ After a `video` event, the next `segments` non-empty segments on the `video` cha
 
 ### Errors
 
-| Status | When                                                                   |
-| ------ | ---------------------------------------------------------------------- |
-| `400`  | Invalid JSON or job fields; missing `Livepeer-Session-Id` header       |
-| `404`  | `/session/jobs` before `/session/start`                                |
-| `409`  | Persistent job while the GPU is busy, or the session already has a job |
-| `503`  | Single-shot while the GPU is busy or the runner is switching models    |
+| Status | When                                                                    |
+| ------ | ----------------------------------------------------------------------- |
+| `400`  | Invalid JSON or job fields; missing `Livepeer-Session-Id` header        |
+| `404`  | `/session/jobs` before `/session/start`                                 |
+| `409`  | Persistent job while busy/unavailable, or the session already has a job |
+| `503`  | Single-shot while busy/unavailable; persistent start while unregistered |
 
 ### Informational endpoints
 
-`GET /healthz` → `{"ok": true}` (503 while switching or if the engine died). `GET /models` → the catalog with each model's app ids, engine and defaults, and the current model.
+`GET /healthz` → `{"ok": true}` when the engine is available and apps are registered; otherwise `{"ok": false}` with HTTP 503. `GET /models` → the catalog with each model's app ids, engine and defaults, and the current model.
 
 ## Configuration
 
 ### Compose environment (`.env`)
 
-Copy [`.env.example`](.env.example) to `.env`. Every value has a default.
+Use the initializer to create private settings and external volumes. [`.env.example`](.env.example) documents local development settings; [the production example](deploy/templates/prod.env.example) lists the existing-node connection fields. Managed mode uses named model/cache/state volumes and a reserved GPU UUID for real engines. Bundled mode retains `HF_CACHE_DIR`, `MODELS_DIR` and `GPU_ID`.
 
-| Variable               | Default                                      | Meaning                                                                                                    |
-| ---------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `ENGINE`               | `stub`                                       | `stub`, `lightx2v`, `sglang` or `vllm-omni`: picks `docker/<engine>.Dockerfile` and `models/<engine>.json` |
-| `MODEL`                | catalog default                              | Model id to load at startup                                                                                |
-| `DELIVERY`             | `both`                                       | `single-shot`, `persistent` or `both`                                                                      |
-| `LIVEPEER_NODE_SOURCE` | `https://github.com/livepeer/node.git#<sha>` | livepeer-node source for the orchestrator image: a git URL pinned to a commit, or a local checkout         |
-| `BOOTSTRAP_SECRET`     | `devsecret`                                  | Shared by orchestrator and runner for dynamic registration. **Change it.**                                 |
-| `RUNNER_ADMIN_TOKEN`   | `change-me`                                  | Bearer token for the admin API. **Change it.**                                                             |
-| `HF_TOKEN`             | empty                                        | For gated Hugging Face models                                                                              |
-| `HF_CACHE_DIR`         | `~/.cache/huggingface`                       | Mounted at `/root/.cache/huggingface`                                                                      |
-| `MODELS_DIR`           | `./weights`                                  | Mounted at `/models` (LightX2V checkpoints)                                                                |
-| `GPU_ID`               | `0`                                          | GPU for `compose.gpu.yml`                                                                                  |
-| `SUBNET_PREFIX`        | `172.30.88`                                  | Compose network `/24`; the runner is `.10`. livepeer-node grants take IPs only.                            |
+The [deployment guide](docs/guides/container-deployment.md) owns Compose setup and storage settings. The [generated reference](docs/reference/configuration.md) lists Python flags and catalog fields. Engine selection is `ENGINE=stub|sglang|lightx2v|vllm-omni|all`; `all` is managed-only. Production defaults to `all`, development to `stub`. Both retain `DELIVERY=both` unless explicitly changed.
 
-### Runner flags (`runner.py`)
+### Runner flags (`video-runner`)
 
 | Flag                           | Default                      | Meaning                                                                              |
 | ------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------ |
 | `--catalog`                    | `models/stub.json`           | Catalog file                                                                         |
+| `--lifecycle`                  | `bundled`                    | `bundled`, `external`, or `managed` engine ownership                                 |
+| `--engine-url`                 | empty                        | Required HTTP origin for an external engine                                          |
+| `--controller-url`             | `http://controller:9200`     | Managed controller origin (Compose configures its control-network alias)             |
+| `--controller-token`           | `$ENGINE_CONTROLLER_TOKEN`   | Managed controller authentication; at least 32 characters                            |
 | `--model`                      | catalog `default`            | Model id to load at startup                                                          |
 | `--orchestrator`               | `http://localhost:8935`      | Orchestrator to register with                                                        |
 | `--secret`                     | `$LIVEPEER_BOOTSTRAP_SECRET` | Bootstrap secret (required)                                                          |
@@ -360,79 +347,52 @@ Environment: `LIVEPEER_BOOTSTRAP_SECRET`, `RUNNER_ADMIN_TOKEN` (empty disables t
 }
 ```
 
-| Key                  | Default   | Meaning                                                                        |
-| -------------------- | --------- | ------------------------------------------------------------------------------ |
-| `id`                 | required  | Model id: lowercase letters, digits, `.` and `-`; appears in app ids           |
-| `engine`             | required  | API flavour: `lightx2v` or `openai-videos`                                     |
-| `command`            | required  | Engine command line; it must listen on `127.0.0.1:<port>`                      |
-| `port`               | required  | Engine port                                                                    |
-| `health_path`        | `/health` | Engine readiness endpoint                                                      |
-| `startup_timeout_s`  | `1800`    | Time allowed for download + load                                               |
-| `job_timeout_s`      | `1800`    | Per-clip limit; the engine job is cancelled after it                           |
-| `price_usd_per_hour` | `0`       | Advertised for both modes; livepeer-node meters it per second                  |
-| `env`                | `{}`      | Extra environment for the engine process                                       |
-| `defaults`           | `{}`      | Job request defaults                                                           |
-| `served_model`       | empty     | `openai-videos` only: value of the `model` form field, if the server wants one |
+| Key                        | Default   | Meaning                                                                                 |
+| -------------------------- | --------- | --------------------------------------------------------------------------------------- |
+| `id`                       | required  | Model id: lowercase letters, digits, `.` and `-`; appears in app ids                    |
+| `engine`                   | required  | API flavour: `lightx2v` or `openai-videos`                                              |
+| `command`                  | required  | Bundled engine command; separate launch tooling binds it to the private engine network. |
+| `port`                     | required  | Engine port                                                                             |
+| `health_path`              | `/health` | Engine readiness endpoint                                                               |
+| `startup_timeout_s`        | `1800`    | Time allowed for download + load                                                        |
+| `job_timeout_s`            | `1800`    | Per-clip deadline; requests cancellation and recovers an owned backend when needed.     |
+| `price_usd_per_hour`       | `0`       | Advertised for both modes; livepeer-node meters it per second                           |
+| `env`                      | `{}`      | Extra environment for the engine process                                                |
+| `defaults`                 | `{}`      | Job request defaults                                                                    |
+| `served_model`             | empty     | `openai-videos` only: value of the `model` form field, if the server wants one          |
+| `task`                     | empty     | LightX2V request task, including `t2av` for the MiniMax-H3 base variant                 |
+| `supports_negative_prompt` | `true`    | Reject unsupported negative prompts before admission; false for MiniMax-H3              |
 
-### Client (`client.py`)
+### Client (`video-client`)
 
 `--model` (model id), `--mode single-shot|persistent`, `--clips`, `--prompt`, `--width`, `--height`, `--num-frames`, `--steps`, `--seed`, `--output` (file prefix), `--discovery` (default `http://localhost:8935/discovery`), `--signer` (remote signer URL for paid use), `--list`.
 
 ## Build
 
-Each image is an engine's official image plus the runner in its own Python 3.12 virtualenv (`/opt/runner`), so the runner's dependencies never touch the engine's torch stack. Runner dependencies install from `uv.lock`.
+Bundled images add the runner to an engine's official image in its own Python 3.12 virtualenv (`/opt/runner`). Separate deployments use [`deploy/docker/cpu.Dockerfile`](deploy/docker/cpu.Dockerfile) for the CPU runner and controller, with a separate optional stub-engine target. These images install locked dependencies without CUDA, PyTorch, or model weights. See [build and deployment commands](docs/guides/container-deployment.md).
 
 ```sh
-docker build -f docker/sglang.Dockerfile -t livepeer-video-engine-runners-sglang .
+docker build -f deploy/docker/sglang.Dockerfile -t livepeer-video-engine-runners-sglang:local .
 # or let compose build it:
-ENGINE=sglang docker compose -f compose.yml -f compose.gpu.yml build
+ENGINE=sglang docker compose --project-directory . -f deploy/compose/bundled.yml -f deploy/compose/gpu.yml build
 ```
 
-| Image                         | Base (build arg)                                                     | Pin before production                 |
-| ----------------------------- | -------------------------------------------------------------------- | ------------------------------------- |
-| `docker/stub.Dockerfile`      | `python:3.12-slim`                                                   | —                                     |
-| `docker/sglang.Dockerfile`    | `SGLANG_IMAGE=lmsysorg/sglang:latest`                                | **Yes** — use a release tag or digest |
-| `docker/vllm-omni.Dockerfile` | `VLLM_OMNI_IMAGE=vllm/vllm-omni:v0.26.0`                             | Validated tag                         |
-| `docker/lightx2v.Dockerfile`  | `LIGHTX2V_IMAGE=lightx2v/lightx2v:26011201-cu128`, `LIGHTX2V_COMMIT` | cu130 tags for RTX 50 / Blackwell     |
+| Image                                | Base (build arg)                                                     | Pin before production                 |
+| ------------------------------------ | -------------------------------------------------------------------- | ------------------------------------- |
+| `deploy/docker/stub.Dockerfile`      | `python:3.12-slim`                                                   | —                                     |
+| `deploy/docker/sglang.Dockerfile`    | `SGLANG_IMAGE=lmsysorg/sglang:latest`                                | **Yes** — use a release tag or digest |
+| `deploy/docker/vllm-omni.Dockerfile` | `VLLM_OMNI_IMAGE=vllm/vllm-omni:v0.26.0`                             | Pin and validate for bundled use      |
+| `deploy/docker/lightx2v.Dockerfile`  | `LIGHTX2V_IMAGE=lightx2v/lightx2v:26011201-cu128`, `LIGHTX2V_COMMIT` | Pin a compatible base and validate    |
 
-The orchestrator image is built by compose from livepeer-node's own `docker/Dockerfile` at `LIVEPEER_NODE_SOURCE` (livepeer-node does not publish an image yet). To try another livepeer-node commit, set `LIVEPEER_NODE_SOURCE=https://github.com/livepeer/node.git#<commit>` or a local checkout path.
+The orchestrator and signer image is built by Compose from the pinned upstream node's own `docker/Dockerfile` at `LIVEPEER_NODE_SOURCE`. The [image-name table](docs/guides/container-deployment.md#image-names-and-roles) lists all managed, development and preparation images. To try another livepeer-node commit, set `LIVEPEER_NODE_SOURCE=https://github.com/livepeer/node.git#<commit>` or a local checkout path.
 
 ## Deploy
 
-### One GPU, all in one host (compose)
-
-```sh
-cp .env.example .env    # set ENGINE, MODEL, BOOTSTRAP_SECRET, RUNNER_ADMIN_TOKEN, weights paths
-docker compose -f compose.yml -f compose.gpu.yml up -d --build --wait
-docker compose logs -f runner         # download and load; registration follows readiness
-uv run client.py --model fastwan2.1-t2v-1.3b
-```
-
-Compose publishes the orchestrator on `127.0.0.1:8935` and the admin API on `127.0.0.1:8990` only. To serve the network, put the orchestrator behind TLS (below).
-
-### Several GPUs, or an existing orchestrator
-
-Run one runner container per GPU and point each at your orchestrator. Each runner needs a URL the orchestrator can reach; private addresses must be granted on the orchestrator (`--runner-grants 10.0.0.5` permits every port on that IP).
-
-```sh
-for gpu in 0 1; do
-  docker run -d --name video-runner-gpu$gpu --restart unless-stopped \
-    --gpus "device=$gpu" --ipc host \
-    -e LIVEPEER_BOOTSTRAP_SECRET -e RUNNER_ADMIN_TOKEN -e HF_TOKEN \
-    -v ~/.cache/huggingface:/root/.cache/huggingface -v /srv/models:/models \
-    -p 10.0.0.5:$((8989 + 2*gpu)):8989 -p 127.0.0.1:$((8990 + 2*gpu)):8990 \
-    livepeer-video-engine-runners-sglang \
-    --host 0.0.0.0 --admin-host 0.0.0.0 --catalog models/sglang.json \
-    --orchestrator https://orchestrator.example.com \
-    --runner-url http://10.0.0.5:$((8989 + 2*gpu))
-done
-```
-
-Give each GPU a different `--model` to offer several models at once without switching.
+Use the [deployment guide](docs/guides/container-deployment.md) for production, complete development, multiple independent GPU instances and advanced bundled/external recipes. GPU models are prepared explicitly into persistent external volumes. Reuse a deployment's exact project, namespace, engine network and controller state when restarting it.
 
 ### The orchestrator
 
-Follow livepeer-node's [orchestrator guide](https://github.com/livepeer/node/blob/main/docs/orchestrator.md). In short:
+Follow the pinned livepeer-node [orchestrator guide](https://github.com/livepeer/node/blob/08081dbda0f4f7b56e362e3af4b6965bfa1b73a4/docs/orchestrator.md):
 
 - `--listen` on an interface, and terminate TLS in a reverse proxy; set `--service-url` to the public HTTPS URL.
 - Prefer `--bootstrap-secret-file` over the environment variable.
@@ -441,7 +401,7 @@ Follow livepeer-node's [orchestrator guide](https://github.com/livepeer/node/blo
 
 ### Paid (on-chain) operation
 
-Off-chain (the default) is free: prices are accepted but discovery advertises the runner as free. For paid use, configure payments on the orchestrator ([livepeer-node configuration](https://github.com/livepeer/node/blob/main/docs/configuration.md)), set `price_usd_per_hour` per catalog model, and have clients pass `--signer`. A single-shot call is billed while its SSE stream is open; a session is billed until it is released, including idle time between clips. A request refused as busy has already paid the challenge's upfront amount (about ten seconds of the price). The on-chain path has not been exercised with these runners yet.
+Offchain testing is free and needs no signer. For paid use, configure a `livepeer/node` orchestrator and its payer-side `livepeer signer`, set positive `price_usd_per_hour` values in the public model catalog, and pass `--signer` from the Python client. See the [node deployment guide](docs/guides/node-deployment.md) and optional [`deploy/compose/signer.yml`](deploy/compose/signer.yml). A single-shot call is billed while its SSE stream is open; a persistent reservation is billed until released, including idle time. A busy refusal can still incur an upfront payment. The [node paid trial](docs/validation/reports/node-paid-validation-2026-10-16.md) verifies the three default models through paid single-shot SSE. Paid persistent delivery, redemption and final settlement remain unvalidated; the legacy paid trial does not establish those scopes.
 
 ## Operations
 
@@ -449,41 +409,43 @@ Off-chain (the default) is free: prices are accepted but discovery advertises th
 # status: current model, GPU busy, open sessions, registrations
 curl -H "Authorization: Bearer $RUNNER_ADMIN_TOKEN" http://127.0.0.1:8990/admin/status
 
-# switch model (blocks until the new model is serving; restores the old one on failure)
+# Switch the default dev stub; choose an ID from your deployed catalog for GPUs.
+# Blocks until serving; attempts to restore the old model on failure.
 curl -X POST -H "Authorization: Bearer $RUNNER_ADMIN_TOKEN" \
-  http://127.0.0.1:8990/admin/model -d '{"model": "minimax-h3-4step"}'
+  http://127.0.0.1:8990/admin/model -d '{"model": "stub-h3"}'
 
 # what the network sees
-uv run client.py --list --discovery https://orchestrator.example.com/discovery
+uv run video-client --list --discovery https://orchestrator.example.com/discovery
 ```
 
-- **Logs:** the runner logs engine output prefixed with the model id, registrations, sessions and every request.
-- **Stopping:** `docker stop` (SIGTERM) deregisters both apps and stops the engine's process group within 30 s.
-- **Abandoned sessions:** released after `--session-idle-timeout`; off-chain sessions never expire on their own.
+- **Logs:** the runner logs registrations and sessions. Bundled engine output is prefixed with the model id; separate engines have their own container logs.
+- **Stopping:** SIGTERM deregisters both apps and releases sessions. Bundled engines get 30 seconds before a forced process-group kill; managed mode requests controller deactivation, which can take longer. Use the [managed shutdown sequence](docs/guides/container-deployment.md#stop-restart-and-update) before removing that stack. External engines remain operator-owned.
+- **Abandoned sessions:** the runner releases idle sessions after `--session-idle-timeout`, including offchain sessions. Setting it to `0` disables that runner deadline.
 - **Health:** container health and `GET /healthz` report the engine; the orchestrator also drops runners that miss heartbeats (30 s).
 
 ## Development
 
 ```sh
 uv sync                                   # Python env with dev tools
-uv run pytest                             # unit tests: catalogs, engine clients vs the stub, trickle publisher
-ENGINE=stub docker compose up -d --build --wait && scripts/e2e.sh   # full network path
+scripts/check.sh                          # links, boundaries, Black, Ruff and CPU unit/contract tests
+tests/e2e/managed.sh                      # isolated network/lifecycle checks
 uvx pre-commit run --all-files            # black, ruff, prettier, whitespace
 ```
 
-Run the runner without Docker (needs Go to build livepeer-node):
+Run the runner without Docker (needs the Go version required by the pinned node source):
 
 ```sh
 git clone https://github.com/livepeer/node.git ../node
-(cd ../node && go build -o bin/livepeer-orchestrator ./cmd/livepeer-orchestrator)
-LIVEPEER_ORCHESTRATOR_BOOTSTRAP_SECRET=devsecret ../node/bin/livepeer-orchestrator \
-  --config= --runner-grants 127.0.0.1:8989 &
+(cd ../node && git checkout --detach 08081dbda0f4f7b56e362e3af4b6965bfa1b73a4 && go build -o bin/livepeer ./cmd/livepeer)
+LIVEPEER_ORCHESTRATOR_BOOTSTRAP_SECRET=devsecret ../node/bin/livepeer orchestrator \
+  --config= --listen=127.0.0.1:8935 --service-url=http://127.0.0.1:8935 \
+  --runner-grants=127.0.0.1:8989 &
 LIVEPEER_BOOTSTRAP_SECRET=devsecret RUNNER_ADMIN_TOKEN=change-me \
-  uv run runner.py --catalog models/stub.json &
-uv run client.py
+  uv run video-runner --catalog models/stub.json &
+uv run video-client
 ```
 
-`uv run` matters: the stub catalog's `python` command must resolve to the project environment.
+`uv run` makes the installed `video-stub-engine` command available to the bundled supervisor.
 
 ### Adding a model
 
@@ -491,33 +453,34 @@ Add an entry to the engine's catalog, with defaults the model supports, and run 
 
 ### Adding an engine
 
-1. Subclass `EngineClient` in `engines.py` (`submit`, `status`, `fetch`, `cancel`) and add its name to `ENGINE_KINDS` and `engine_client()`.
-2. Teach `stub_engine.py` the API so the network path stays testable without a GPU, and add a stub catalog entry for it.
-3. Add `docker/<engine>.Dockerfile` and `models/<engine>.json`.
+1. Subclass `EngineClient` in `src/video_runners/backends/base.py` (`submit`, `status`, `fetch`, `cancel`), add the adapter under `backends/`, and update `ENGINE_KINDS` in `catalog.py` and `engine_client()` in `backends/__init__.py`.
+2. Teach `src/video_runners/stub_engine.py` the API so the network path stays testable without a GPU, and add a stub catalog entry for it.
+3. Add `deploy/docker/<engine>.Dockerfile` and `models/<engine>.json`.
 4. Add tests, and document the engine here.
 
 ## Conventions
 
-- **Layering.** `engines.py` never imports Livepeer code; `runner.py` and `client.py` are the only files that do, and mark each SDK call with `# Livepeer: n`.
+- **Layering.** Contracts, catalogs, backends, lifecycle and controller code stay independent of Livepeer. Application integration lives in `src/video_runners/runner/` and `client.py`, with SDK calls marked `# Livepeer: n`. Operator validation tools may use both integrations; runtime imports follow the [architecture](ARCHITECTURE.md#dependency-boundaries).
 - **Python.** 3.12+, `from __future__ import annotations`, type hints, `black` formatting and `ruff` linting (enforced by pre-commit and CI). Comments explain _why_, not what.
-- **Identifiers.** Model ids are lowercase upstream names (`wan2.2-ti2v-5b`), engine-agnostic. App ids are `video:generations/<model>` and `video:sessions/<model>`. Engines listen on `127.0.0.1:9100` inside the container.
+- **Identifiers.** Per-engine model IDs use lowercase upstream names (`wan2.2-ti2v-5b`); the combined catalog prefixes them with the engine. App IDs are `video:generations/<model>` and `video:sessions/<model>`. Bundled engines listen on loopback; separate engines bind to their private generation network without publishing a host port.
 - **Catalogs** hold everything model-specific: commands, defaults, timeouts, prices. Code changes should not be needed to add a model.
-- **Pinning.** Every external input is pinned: livepeer-node commit, engine base images and sources, `uv.lock`, CI actions.
+- **Pinning.** Managed deployments pin node source, engine images, weight revisions and `uv.lock`. Bundled base images are build arguments; review and pin them before deployment.
 - **Commits.** Imperative, sentence-case summaries that say what changes for the reader ("Release abandoned sessions after an idle timeout"); body explains why. One logical change per commit.
-- **Versioning.** [Semantic Versioning](https://semver.org/). App ids, endpoints, event shapes, catalog keys and CLI flags are the public contract; breaking any of them is a major version. Changes are recorded in [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com/)).
+- **Versioning.** [Semantic Versioning](https://semver.org/). App ids, endpoints, event shapes, catalog keys and CLI flags are the public contract; breaking any of them requires a major version (a minor version while at 0.x). Changes are recorded in [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com/)).
 
 ## Known issues and limitations
 
-- **Not GPU-validated yet** — see [Project status](#project-status).
-- **Trickle publishing bypasses the SDK publisher.** `livepeer-gateway`'s `TricklePublisher` opens each segment's upload before it has data, but aiohttp sends request headers only with the first body byte; livepeer-node then times the idle connection out (5 s new / 90 s reused) and the next message or clip is lost. The runner sends each segment as one complete request instead (`ChannelPublisher` in `runner.py`). Worth fixing upstream in the SDK.
+- **Limited hardware coverage.** The three default models pass 832×480 workloads and selected recovery cases on one RTX 5090. Paid persistent delivery with the node signer, larger models, host/daemon outages, long-duration operation and settlement remain unvalidated. See the [workload report](docs/validation/reports/operations-validation-2026-10-15.md).
+- **Trickle publishing bypasses the SDK publisher.** `livepeer-gateway`'s `TricklePublisher` opens each segment's upload before it has data, but aiohttp sends request headers only with the first body byte; livepeer-node then times the idle connection out (5 s new / 90 s reused) and the next message or clip is lost. The runner sends each segment as one complete request instead (`ChannelPublisher` in `src/video_runners/runner/delivery.py`). Worth fixing upstream in the SDK.
 - **One job per GPU.** No batching across requests; each runner advertises capacity 1 per mode.
-- **`--busy reject` is per runner.** Two runners on one GPU, or several orchestrators, are not coordinated.
+- **Admission is per runner.** Managed controllers sharing the GPU lease volume exclude duplicate assignments. Bundled/external deployments and unrelated GPU processes do not participate in that lease; operators must prevent GPU sharing.
 - **Request fields are best effort per engine.** LightX2V takes steps from its config; resolutions and frame counts must be ones the model supports.
 - **Clip-based, not real-time.** These engines render whole clips. Real-time streaming models (Self-Forcing, StreamDiffusionV2, …) need a frame-streaming runner, not this one.
-- **Tested against livepeer-node only**, not go-livepeer.
+- **Node versions.** The supported deployment uses the pinned `livepeer/node` source. Changing it requires protocol and payment checks. The legacy go-livepeer deployment files have been removed.
 
 ## Roadmap
 
+- Extend the [implemented engine-container rollout](docs/design/engine-container-rollout.md) with remaining hardware fault, paid-delivery and settlement checks.
 - GPU validation on RTX 4090 and RTX 5090 for each catalog model; pin image tags and record timings here.
 - Publish runner images to GHCR, and a self-hosted GPU workflow for release checks.
 - Image-to-video (TI2V) inputs, and audio for MiniMax-H3.

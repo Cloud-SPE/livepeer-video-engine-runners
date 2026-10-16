@@ -1,0 +1,18 @@
+# Same-host Docker networking: publish no runner port. The orchestrator reaches
+# the runner by its reserved IP (or project alias) on the selected existing network.
+services:
+  runner:
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL:?Set the orchestrator URL reachable from the runner}
+      RUNNER_URL: ${RUNNER_URL:?Set the runner URL reachable from the orchestrator}
+      LIVEPEER_BOOTSTRAP_SECRET: ${BOOTSTRAP_SECRET:?Match the existing orchestrator bootstrap secret}
+    ports: !override
+      - "127.0.0.1:${RUNNER_ADMIN_PORT:-8990}:8990"
+    networks:
+      orchestrator:
+        ipv4_address: ${EXISTING_RUNNER_IP:?Reserve a runner IP on the existing network for the node's IP-only grant}
+        aliases: ["${COMPOSE_PROJECT_NAME:-video-engines}-runner"]
+networks:
+  orchestrator:
+    external: true
+    name: ${EXISTING_ORCHESTRATOR_NETWORK:?Set the existing private Docker network}

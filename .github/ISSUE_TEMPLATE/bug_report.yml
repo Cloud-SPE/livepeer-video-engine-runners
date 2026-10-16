@@ -12,7 +12,7 @@ body:
     id: repro
     attributes:
       label: Steps to reproduce
-      description: Commands, client flags and request payloads.
+      description: Commands, client flags and request payloads. Replace private hosts, addresses, account identities and resource names with placeholders.
       render: shell
     validations:
       required: true
@@ -47,5 +47,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: "`docker compose logs runner orchestrator`; remove tokens and secrets first."
+      description: "Use your deployment's Compose/env selection to collect runner/controller logs; collect node logs from its own project. Remove secrets, private hosts/addresses, account identities and resource names before sharing."
       render: text

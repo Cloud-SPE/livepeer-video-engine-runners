@@ -1,0 +1,57 @@
+# Optional client-side remote signer. The Python SDK is the application client;
+# no traditional gateway daemon is needed. Linux host networking, loopback only.
+name: ${SIGNER_PROJECT_NAME:-livepeer-video-signer}
+services:
+  signer:
+    build:
+      context: ${LIVEPEER_NODE_SOURCE:-https://github.com/livepeer/node.git#08081dbda0f4f7b56e362e3af4b6965bfa1b73a4}
+      dockerfile: docker/Dockerfile
+    image: livepeer-node:local
+    runtime: runc
+    user: "${SIGNER_UID:?Set the container-visible keystore owner UID}:${SIGNER_GID:?Set the container-visible keystore owner GID}"
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    command:
+      - signer
+      - --config=/etc/livepeer/signer.toml
+      - --listen=127.0.0.1:${SIGNER_PORT:-8937}
+      - --metrics-listen=127.0.0.1:${SIGNER_METRICS_PORT:-8938}
+    volumes:
+      - type: bind
+        source: ${SIGNER_CONFIG_FILE:?Set the private signer TOML path}
+        target: /etc/livepeer/signer.toml
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${SIGNER_KEYSTORE_FILE:?Set the existing encrypted keystore file}
+        target: /run/secrets/signer-keystore.json
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${SIGNER_PASSWORD_FILE:?Set the existing password file}
+        target: /run/secrets/signer-password
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${SIGNER_RPC_URL_FILE:?Set the owner-only RPC URL file}
+        target: /run/secrets/signer-rpc-url
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${SIGNER_STATE_DIR:?Set an existing signer-owned state directory}
+        target: /var/lib/livepeer/signer
+        bind: { create_host_path: false }
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - exec 3<>/dev/tcp/127.0.0.1/${SIGNER_METRICS_PORT:-8938}; printf 'GET /readyz HTTP/1.0\r\n\r\n' >&3; head -n 1 <&3 | grep -q '200 OK'
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s

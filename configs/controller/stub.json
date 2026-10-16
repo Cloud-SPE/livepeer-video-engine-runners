@@ -1,0 +1,40 @@
+{
+  "namespace": "${ENGINE_NAMESPACE}",
+  "network": "${ENGINE_NETWORK}",
+  "gpu": null,
+  "allow_local_images": true,
+  "models": {
+    "stub-wan-t2v": {
+      "image": "livepeer-video-stub-engine:local",
+      "command": [
+        "video-stub-engine",
+        "--api",
+        "openai",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--delay",
+        "1"
+      ],
+      "user": "65532:65532",
+      "timeout": 30
+    },
+    "stub-h3": {
+      "image": "livepeer-video-stub-engine:local",
+      "command": [
+        "video-stub-engine",
+        "--api",
+        "lightx2v",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--delay",
+        "1"
+      ],
+      "user": "65532:65532",
+      "timeout": 30
+    }
+  }
+}

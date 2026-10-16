@@ -1,0 +1,10 @@
+# For external.yml only. Managed engines receive their GPU from the controller.
+services:
+  engine:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU_ID:-0}"]
+              capabilities: [gpu]

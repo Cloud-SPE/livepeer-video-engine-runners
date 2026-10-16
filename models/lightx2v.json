@@ -5,7 +5,7 @@
       "id": "wan2.1-t2v-1.3b",
       "engine": "lightx2v",
       "command": [
-        "python",
+        "python3",
         "-m",
         "lightx2v.server",
         "--model_cls",
@@ -32,13 +32,14 @@
         "width": 832,
         "height": 480,
         "num_frames": 81
-      }
+      },
+      "task": "t2v"
     },
     {
       "id": "minimax-h3-4step",
       "engine": "lightx2v",
       "command": [
-        "python",
+        "python3",
         "-m",
         "lightx2v.server",
         "--model_cls",
@@ -69,7 +70,9 @@
         "width": 768,
         "height": 448,
         "num_frames": 121
-      }
+      },
+      "task": "t2av",
+      "supports_negative_prompt": false
     }
   ]
 }

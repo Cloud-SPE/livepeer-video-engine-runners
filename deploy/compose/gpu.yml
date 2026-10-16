@@ -1,0 +1,11 @@
+# GPU overlay: give the runner one NVIDIA GPU (GPU_ID, default 0).
+#   ENGINE=lightx2v docker compose --project-directory . -f deploy/compose/bundled.yml -f deploy/compose/gpu.yml up -d --build
+services:
+  runner:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU_ID:-0}"]
+              capabilities: [gpu]

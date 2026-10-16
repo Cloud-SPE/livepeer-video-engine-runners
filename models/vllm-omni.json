@@ -12,7 +12,9 @@
         "--host",
         "127.0.0.1",
         "--port",
-        "9100"
+        "9100",
+        "--enable-cpu-offload",
+        "--vae-use-tiling"
       ],
       "port": 9100,
       "defaults": {

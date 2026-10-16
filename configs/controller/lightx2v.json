@@ -1,0 +1,119 @@
+{
+  "namespace": "${ENGINE_NAMESPACE}",
+  "network": "${ENGINE_NETWORK}",
+  "gpu": "${ENGINE_GPU_UUID}",
+  "models": {
+    "wan2.1-t2v-1.3b": {
+      "image": "${LIGHTX2V_ENGINE_IMAGE}",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "wan2.1",
+        "--task",
+        "t2v",
+        "--model_path",
+        "/models/Wan2.1-T2V-1.3B",
+        "--config_json",
+        "/app/configs/lightx2v/wan21_t2v_1_3b.json",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/lightx2v/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/lightx2v/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/lightx2v/triton",
+        "CUDA_CACHE_PATH": "/cache/lightx2v/cuda"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "source": "${MODELS_VOLUME}",
+          "target": "/models",
+          "read_only": true,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 1800,
+      "shm_size": 8589934592,
+      "memory": 34359738368
+    },
+    "minimax-h3-4step": {
+      "image": "${LIGHTX2V_ENGINE_IMAGE}",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "minimax_h3",
+        "--model-variant",
+        "fl2av",
+        "--task",
+        "t2av",
+        "--model_path",
+        "/models/MiniMax-H3",
+        "--config_json",
+        "/app/configs/lightx2v/minimax_h3_int8_4step_offload.json",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/lightx2v/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/lightx2v/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/lightx2v/triton",
+        "CUDA_CACHE_PATH": "/cache/lightx2v/cuda"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "source": "${MODELS_VOLUME}",
+          "target": "/models",
+          "read_only": true,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 3600,
+      "shm_size": 8589934592,
+      "memory": 68719476736
+    }
+  }
+}

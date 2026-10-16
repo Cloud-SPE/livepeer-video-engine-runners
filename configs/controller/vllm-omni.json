@@ -1,0 +1,87 @@
+{
+  "namespace": "${ENGINE_NAMESPACE}",
+  "network": "${ENGINE_NETWORK}",
+  "gpu": "${ENGINE_GPU_UUID}",
+  "models": {
+    "wan2.2-ti2v-5b": {
+      "image": "vllm/vllm-omni@sha256:5cba1538c6f8ee81e8bea6708c24e68d7b2640f466a9fbf2ef15e68f2168b48b",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+        "--omni",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--enable-cpu-offload",
+        "--vae-use-tiling"
+      ],
+      "env": {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/vllm-omni/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/vllm-omni/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/vllm-omni/triton",
+        "CUDA_CACHE_PATH": "/cache/vllm-omni/cuda",
+        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 1800,
+      "shm_size": 8589934592,
+      "memory": 34359738368
+    },
+    "wan2.2-t2v-a14b": {
+      "image": "vllm/vllm-omni@sha256:5cba1538c6f8ee81e8bea6708c24e68d7b2640f466a9fbf2ef15e68f2168b48b",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+        "--omni",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100"
+      ],
+      "env": {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/vllm-omni/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/vllm-omni/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/vllm-omni/triton",
+        "CUDA_CACHE_PATH": "/cache/vllm-omni/cuda",
+        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 3600,
+      "shm_size": 8589934592,
+      "memory": 34359738368
+    }
+  }
+}

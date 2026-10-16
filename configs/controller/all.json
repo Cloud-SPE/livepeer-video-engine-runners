@@ -1,0 +1,281 @@
+{
+  "namespace": "${ENGINE_NAMESPACE}",
+  "network": "${ENGINE_NETWORK}",
+  "gpu": "${ENGINE_GPU_UUID}",
+  "models": {
+    "sglang-fastwan2.1-t2v-1.3b": {
+      "image": "lmsysorg/sglang@sha256:b1259f3ea3275f66237c498ea388919729018bc9f01c3d638391e06e2cf3f469",
+      "command": [
+        "sglang",
+        "serve",
+        "--model-path",
+        "FastVideo/FastWan2.1-T2V-1.3B-Diffusers",
+        "--num-gpus",
+        "1",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100"
+      ],
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "shm_size": 8589934592,
+      "memory": 51539607552,
+      "timeout": 1800,
+      "env": {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/sglang/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/sglang/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/sglang/triton",
+        "CUDA_CACHE_PATH": "/cache/sglang/cuda"
+      }
+    },
+    "lightx2v-wan2.1-t2v-1.3b": {
+      "image": "${LIGHTX2V_ENGINE_IMAGE}",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "wan2.1",
+        "--task",
+        "t2v",
+        "--model_path",
+        "/models/Wan2.1-T2V-1.3B",
+        "--config_json",
+        "/app/configs/lightx2v/wan21_t2v_1_3b.json",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/lightx2v/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/lightx2v/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/lightx2v/triton",
+        "CUDA_CACHE_PATH": "/cache/lightx2v/cuda"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "source": "${MODELS_VOLUME}",
+          "target": "/models",
+          "read_only": true,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 1800,
+      "shm_size": 8589934592,
+      "memory": 34359738368
+    },
+    "vllm-omni-wan2.2-ti2v-5b": {
+      "image": "vllm/vllm-omni@sha256:5cba1538c6f8ee81e8bea6708c24e68d7b2640f466a9fbf2ef15e68f2168b48b",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+        "--omni",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--enable-cpu-offload",
+        "--vae-use-tiling"
+      ],
+      "env": {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/vllm-omni/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/vllm-omni/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/vllm-omni/triton",
+        "CUDA_CACHE_PATH": "/cache/vllm-omni/cuda",
+        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 1800,
+      "shm_size": 8589934592,
+      "memory": 34359738368
+    },
+    "sglang-wan2.1-t2v-1.3b": {
+      "image": "lmsysorg/sglang@sha256:b1259f3ea3275f66237c498ea388919729018bc9f01c3d638391e06e2cf3f469",
+      "command": [
+        "sglang",
+        "serve",
+        "--model-path",
+        "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+        "--text-encoder-cpu-offload",
+        "--pin-cpu-memory",
+        "--num-gpus",
+        "1",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100"
+      ],
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "shm_size": 8589934592,
+      "memory": 51539607552,
+      "timeout": 1800,
+      "env": {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/sglang/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/sglang/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/sglang/triton",
+        "CUDA_CACHE_PATH": "/cache/sglang/cuda"
+      }
+    },
+    "lightx2v-minimax-h3-4step": {
+      "image": "${LIGHTX2V_ENGINE_IMAGE}",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "minimax_h3",
+        "--model-variant",
+        "fl2av",
+        "--task",
+        "t2av",
+        "--model_path",
+        "/models/MiniMax-H3",
+        "--config_json",
+        "/app/configs/lightx2v/minimax_h3_int8_4step_offload.json",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/lightx2v/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/lightx2v/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/lightx2v/triton",
+        "CUDA_CACHE_PATH": "/cache/lightx2v/cuda"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "source": "${MODELS_VOLUME}",
+          "target": "/models",
+          "read_only": true,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 3600,
+      "shm_size": 8589934592,
+      "memory": 68719476736
+    },
+    "vllm-omni-wan2.2-t2v-a14b": {
+      "image": "vllm/vllm-omni@sha256:5cba1538c6f8ee81e8bea6708c24e68d7b2640f466a9fbf2ef15e68f2168b48b",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+        "--omni",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100"
+      ],
+      "env": {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": "/cache/vllm-omni/torch",
+        "TORCHINDUCTOR_CACHE_DIR": "/cache/vllm-omni/torchinductor",
+        "TRITON_CACHE_DIR": "/cache/vllm-omni/triton",
+        "CUDA_CACHE_PATH": "/cache/vllm-omni/cuda",
+        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm"
+      },
+      "mounts": [
+        {
+          "source": "${HF_CACHE_VOLUME}",
+          "target": "/root/.cache/huggingface",
+          "read_only": false,
+          "type": "volume"
+        },
+        {
+          "type": "volume",
+          "source": "${ENGINE_CACHE_VOLUME}",
+          "target": "/cache",
+          "read_only": false
+        }
+      ],
+      "timeout": 3600,
+      "shm_size": 8589934592,
+      "memory": 34359738368
+    }
+  }
+}

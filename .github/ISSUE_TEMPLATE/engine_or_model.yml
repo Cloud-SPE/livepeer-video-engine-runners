@@ -29,4 +29,4 @@ body:
     id: results
     attributes:
       label: Results
-      description: GPU and VRAM, resolution, frames, steps, load time, seconds per clip, peak VRAM, catalog entry used.
+      description: GPU type and VRAM, driver, immutable engine image, resolution, frames, steps, load time, seconds per clip, peak VRAM, catalog entry used. Omit hostnames, actual addresses, account identities, GPU UUIDs and private resource names.

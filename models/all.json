@@ -1,0 +1,176 @@
+{
+  "default": "sglang-fastwan2.1-t2v-1.3b",
+  "models": [
+    {
+      "id": "sglang-fastwan2.1-t2v-1.3b",
+      "engine": "openai-videos",
+      "command": [
+        "sglang",
+        "serve",
+        "--model-path",
+        "FastVideo/FastWan2.1-T2V-1.3B-Diffusers",
+        "--num-gpus",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100"
+      ],
+      "port": 9100,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 61,
+        "fps": 16,
+        "steps": 3
+      }
+    },
+    {
+      "id": "lightx2v-wan2.1-t2v-1.3b",
+      "engine": "lightx2v",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "wan2.1",
+        "--task",
+        "t2v",
+        "--model_path",
+        "/models/Wan2.1-T2V-1.3B",
+        "--config_json",
+        "/app/configs/lightx2v/wan21_t2v_1_3b.json",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "port": 9100,
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+      },
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 81
+      },
+      "task": "t2v"
+    },
+    {
+      "id": "vllm-omni-wan2.2-ti2v-5b",
+      "engine": "openai-videos",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+        "--omni",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100",
+        "--enable-cpu-offload",
+        "--vae-use-tiling"
+      ],
+      "port": 9100,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 49,
+        "fps": 24,
+        "steps": 30
+      }
+    },
+    {
+      "id": "sglang-wan2.1-t2v-1.3b",
+      "engine": "openai-videos",
+      "command": [
+        "sglang",
+        "serve",
+        "--model-path",
+        "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+        "--text-encoder-cpu-offload",
+        "--pin-cpu-memory",
+        "--num-gpus",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100"
+      ],
+      "port": 9100,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 81,
+        "fps": 16,
+        "steps": 30
+      }
+    },
+    {
+      "id": "lightx2v-minimax-h3-4step",
+      "engine": "lightx2v",
+      "command": [
+        "python3",
+        "-m",
+        "lightx2v.server",
+        "--model_cls",
+        "minimax_h3",
+        "--model-variant",
+        "fl2av",
+        "--task",
+        "t2av",
+        "--model_path",
+        "/models/MiniMax-H3",
+        "--config_json",
+        "/app/configs/lightx2v/minimax_h3_int8_4step_offload.json",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100",
+        "--max_queue_size",
+        "2"
+      ],
+      "port": 9100,
+      "startup_timeout_s": 3600,
+      "job_timeout_s": 3600,
+      "env": {
+        "PYTHONPATH": "/opt/lightx2v",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+      },
+      "defaults": {
+        "width": 768,
+        "height": 448,
+        "num_frames": 121
+      },
+      "task": "t2av",
+      "supports_negative_prompt": false
+    },
+    {
+      "id": "vllm-omni-wan2.2-t2v-a14b",
+      "engine": "openai-videos",
+      "command": [
+        "vllm",
+        "serve",
+        "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+        "--omni",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "9100"
+      ],
+      "port": 9100,
+      "startup_timeout_s": 3600,
+      "job_timeout_s": 3600,
+      "defaults": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 81,
+        "fps": 16,
+        "steps": 40
+      }
+    }
+  ]
+}

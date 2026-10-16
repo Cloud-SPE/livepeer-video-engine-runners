@@ -1,0 +1,63 @@
+{
+  "defaults": {
+    "sglang": "fastwan2.1-t2v-1.3b",
+    "vllm-omni": "wan2.2-ti2v-5b",
+    "lightx2v": "wan2.1-t2v-1.3b"
+  },
+  "models": {
+    "sglang": {
+      "fastwan2.1-t2v-1.3b": {
+        "repo": "FastVideo/FastWan2.1-T2V-1.3B-Diffusers",
+        "revision": "25e7ed7f41fd8ce2fdd108688c65e8caf0ce3aef",
+        "storage": "hf"
+      },
+      "wan2.1-t2v-1.3b": {
+        "repo": "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+        "revision": "0fad780a534b6463e45facd96134c9f345acfa5b",
+        "storage": "hf"
+      }
+    },
+    "vllm-omni": {
+      "wan2.2-ti2v-5b": {
+        "repo": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+        "revision": "b8fff7315c768468a5333511427288870b2e9635",
+        "storage": "hf"
+      },
+      "wan2.2-t2v-a14b": {
+        "repo": "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+        "revision": "5be7df9619b54f4e2667b2755bc6a756675b5cd7",
+        "storage": "hf"
+      }
+    },
+    "lightx2v": {
+      "wan2.1-t2v-1.3b": {
+        "repo": "Wan-AI/Wan2.1-T2V-1.3B",
+        "revision": "37ec512624d61f7aa208f7ea8140a131f93afc9a",
+        "storage": "models",
+        "directory": "Wan2.1-T2V-1.3B"
+      },
+      "minimax-h3-4step": {
+        "repo": "MiniMaxAI/MiniMax-H3",
+        "revision": "42ed227ee7df40d41602854ae760620d6eb651fe",
+        "storage": "models",
+        "directory": "MiniMax-H3",
+        "extra_files": [
+          {
+            "repo": "lightx2v/Minimax-h3-Turbo",
+            "revision": "3ec17a324ced54151364f24f8b5fb6bf7e26414f",
+            "filename": "minimax_h3_fl2v_turbo_4step_v1.0_768p_bf16.safetensors"
+          }
+        ],
+        "required_files": [
+          "MiniMax-H3/transformer/config.json",
+          "MiniMax-H3/text_encoder/config.json",
+          "MiniMax-H3/tokenizer/tokenizer_config.json",
+          "MiniMax-H3/vae/config.json",
+          "MiniMax-H3/audio_vae/config.json",
+          "minimax_h3_int8.safetensors",
+          "minimax_h3_fl2v_turbo_4step_v1.0_768p_bf16.safetensors"
+        ]
+      }
+    }
+  }
+}
