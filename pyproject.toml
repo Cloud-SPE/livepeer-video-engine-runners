@@ -20,7 +20,7 @@ Issues = "https://github.com/Cloud-SPE/livepeer-video-engine-runners/issues"
 Changelog = "https://github.com/Cloud-SPE/livepeer-video-engine-runners/blob/main/CHANGELOG.md"
 
 [dependency-groups]
-assets = ["huggingface-hub==1.0.1"]
+assets = ["huggingface-hub==2.2.0"]
 stub = ["av>=11", "numpy>=1.26"]
 dev = ["pytest>=8.3", { include-group = "stub" }]
 
