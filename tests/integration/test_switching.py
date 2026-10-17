@@ -24,6 +24,86 @@ from video_runners.runner.sessions import Session
 MODELS, DEFAULT = load_catalog(Path(__file__).resolve().parents[2] / "models/stub.json")
 
 
+def test_shutdown_cancels_a_pending_force_switch_before_it_can_activate_a_replacement():
+    async def scenario():
+        stopping, may_stop = asyncio.Event(), asyncio.Event()
+        starts, stops = [], []
+
+        class Supervisor(EngineSupervisor):
+            def __init__(self):
+                super().__init__()
+                self.engine_running = True
+
+            @property
+            def running(self):
+                return self.engine_running
+
+            async def stop(self):
+                stops.append(True)
+                if len(stops) == 1:
+                    stopping.set()
+                    await may_stop.wait()
+                self.engine_running = False
+
+            async def start(self, spec, client):
+                starts.append(spec.id)
+                self.spec = spec
+                self.engine_running = True
+
+        async with aiohttp.ClientSession() as http:
+            supervisor = Supervisor()
+            supervisor.spec = MODELS[DEFAULT]
+            runner = Runner(
+                argparse.Namespace(busy="reject"), MODELS, http, supervisor=supervisor
+            )
+            runner.client = engine_client(supervisor.spec, http)
+            runner.available = True
+
+            async def register(_):
+                pass
+
+            runner._register = register
+            forcing = asyncio.create_task(runner.switch("stub-h3", force=True))
+            await asyncio.wait_for(stopping.wait(), 1)
+            shutdown = asyncio.create_task(runner.shutdown())
+            await asyncio.sleep(0)
+            may_stop.set()
+            await asyncio.wait_for(
+                asyncio.gather(forcing, shutdown, return_exceptions=True), 1
+            )
+            assert not starts, "shutdown must prevent replacement activation"
+            assert not supervisor.running and not runner.available
+            assert not runner.gpu.locked()
+
+    asyncio.run(scenario())
+
+
+def test_model_switching_cannot_restart_an_engine_after_shutdown_begins():
+    async def scenario():
+        starts = []
+
+        class Supervisor(EngineSupervisor):
+            async def start(self, spec, client):
+                starts.append(spec.id)
+                self.spec = spec
+
+        async with aiohttp.ClientSession() as http:
+            supervisor = Supervisor()
+            supervisor.spec = MODELS[DEFAULT]
+            runner = Runner(argparse.Namespace(), MODELS, http, supervisor=supervisor)
+            runner.closing = True
+
+            async def register(_):
+                pass
+
+            runner._register = register
+            with pytest.raises(Busy, match="shutting down"):
+                await runner.switch("stub-h3", force=True)
+            assert not starts
+
+    asyncio.run(scenario())
+
+
 def test_graceful_switch_timeout_preserves_active_work_and_registration():
     async def scenario():
         starts = []

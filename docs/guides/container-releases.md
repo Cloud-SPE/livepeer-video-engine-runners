@@ -26,7 +26,7 @@ Tags identify versions for humans. Deployments use the recorded registry
 Configure tag immutability in the registry if required. A new build/registry
 digest is not fresh hardware-inference evidence.
 
-## Publish from a build machine
+## Initial or changed-engine publication
 
 Use a clean checkout, Docker Buildx and a registry login with push access to the
 selected namespace. A GPU, model volumes and payer credentials are unnecessary.
@@ -59,6 +59,35 @@ must be new. Partial publication retains a failed manifest with completed image
 references; it produces no deployable env file. Publication across repositories
 is not atomic. Inspect a failed build before creating a new release attempt.
 Published images and build caches are retained; no daemon prune is performed.
+
+This full publication is an explicit operator action for the initial engine
+baseline or changed engine inputs. It is not the normal CPU CI path.
+
+## Normal CPU publication
+
+Reuse a trusted complete published baseline when engine inputs are unchanged:
+
+```sh
+python3 src/video_runners/tools/release.py publish \
+  --registry "$CONTAINER_REGISTRY" --namespace "$CONTAINER_NAMESPACE" \
+  --tag "$RELEASE_TAG" --reuse-manifest /private/engine-baseline.json \
+  --output "artifacts/releases/$RELEASE_TAG"
+```
+
+Use the same `--reuse-manifest` with `plan` to preview this selection. Reuse
+verifies the LightX2V base, upstream source pin, engine Dockerfile and complete
+baked-configuration hash set. Changed inputs fail before publication and require
+an explicit changed-engine release; they never trigger a large engine build in
+normal CI. The node image is also reused when its upstream source pin matches.
+A changed node source triggers a CPU node build. Runner, controller and
+model-tools are built/published for the new source revision. No GPU image is
+pulled, rebuilt, smoke-run or pushed on the matching reuse path.
+
+The new manifest combines current CPU digests with the existing engine/node
+digests and their original tags/source provenance. Previous evidence is not
+rewritten. This keeps versioning independent while rejecting incompatible engine
+reuse. Changing a weight/profile does not inherently require an image rebuild;
+it still requires the relevant configuration and hardware validation.
 
 The output includes `manifest.json` and `release.env`, both excluded from Git
 under `artifacts/`. Preserve these with the release. Review source changes and
@@ -97,20 +126,23 @@ Preserve controller state and external model/cache/wallet volumes. Follow the
 For ordinary development, keep local image defaults and the documented local
 build workflow. Do not combine digest release overrides with `up --build`.
 
-## Manual GitHub release workflow
+## Manual GitHub CPU release workflow
 
 The [release workflow](../../.github/workflows/release.yml) is manually triggered;
-PRs and normal pushes do not publish images. It requires an explicitly configured
-Linux x64 Docker worker labeled `container-release`, with sufficient disk for
-GPU base layers and build intermediates. A typical hosted worker's disk is not
-assumed sufficient. The worker does not need a GPU, model data or payer keys.
+PRs and normal pushes do not publish images. It uses a normal GitHub-hosted Linux
+worker and the verified reuse path above. No build-worker service is installed
+on an operator machine. The worker needs no GPU, model data or payer keys.
 
 Configure repository variables `CONTAINER_REGISTRY`, `CONTAINER_NAMESPACE`, and
-secrets `CONTAINER_REGISTRY_USER`, `CONTAINER_REGISTRY_PASSWORD`. Use a registry
+secrets `CONTAINER_REGISTRY_USER`, `CONTAINER_REGISTRY_PASSWORD`. Set repository
+variable `CONTAINER_BASE_RELEASE_MANIFEST` to the JSON contents of a trusted
+complete published baseline. Update it explicitly after a changed-engine release.
+It contains image references/provenance, never credentials. Use a registry
 account scoped to the release namespace. Local Docker login is separate from
 GitHub's credentials. Never put a registry password in YAML or an input argument.
-The workflow runs fast checks and Compose resolution, builds/smoke-checks images,
-publishes them and retains the manifest/env as artifacts. Separate CPU integration,
+The workflow runs fast checks, Compose resolution and baseline compatibility
+checks, builds/smoke-checks the CPU images, publishes them and retains the combined
+manifest/env as artifacts. Separate CPU integration,
 hardware and paid gates remain those in the [verification guide](../reference/checks.md).
-Adding the workflow file does not register a worker or activate it on the remote
-repository; repository publication and worker installation remain explicit actions.
+Adding the workflow file does not activate it on the remote repository;
+repository publication and registry-variable/secret configuration remain explicit actions.

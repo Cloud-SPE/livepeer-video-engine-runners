@@ -59,12 +59,13 @@ def plan(root, registry, namespace, tag, revision):
     ]
     inputs += sorted(
         str(file.relative_to(root))
-        for pattern in (
-            "models/*.json",
-            "configs/controller/*.json",
-            "configs/lightx2v/*.json",
-        )
+        for pattern in ("models/*.json", "configs/controller/*.json")
         for file in root.glob(pattern)
+    )
+    inputs += sorted(
+        str(file.relative_to(root))
+        for file in (root / "configs/lightx2v").rglob("*")
+        if file.is_file()
     )
     inputs += sorted(
         {
@@ -87,12 +88,55 @@ def plan(root, registry, namespace, tag, revision):
     }
 
 
+def reuse_images(planned, previous):
+    if previous.get("schema_version") != 1 or previous.get("status") != "published":
+        raise ValueError("a complete published engine release is required for reuse")
+    deployment_env(previous)
+
+    def engine_files(value):
+        return {
+            name: digest
+            for name, digest in value["input_sha256"].items()
+            if name == "deploy/docker/lightx2v-engine.Dockerfile"
+            or name.startswith("configs/lightx2v/")
+        }
+
+    if any(
+        previous["engine_inputs"][key] != planned["engine_inputs"][key]
+        for key in ("lightx2v_base", "lightx2v_commit")
+    ) or engine_files(previous) != engine_files(planned):
+        raise ValueError(
+            "engine release inputs changed; publish an explicit engine release before CPU publication"
+        )
+    for name in ("node", "lightx2v-engine"):
+        component = planned["components"][name]
+        if (
+            name == "node"
+            and component["context"] != previous["components"][name]["context"]
+        ):
+            continue
+        component["reuse"] = previous["images"][name]
+        component["tag"] = previous["components"][name]["tag"]
+        component["image_source_revision"] = previous["components"][name].get(
+            "image_source_revision",
+            (
+                component["context"].rsplit("#", 1)[1]
+                if name == "node"
+                else previous["source_revision"]
+            ),
+        )
+
+
 def publish(root, planned, output, docker):
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     manifest = {**planned, "status": "building", "images": {}}
     save(output / "manifest.json", manifest)
     try:
         for name, component in planned["components"].items():
+            if "reuse" in component:
+                manifest["images"][name] = component["reuse"]
+                save(output / "manifest.json", manifest)
+                continue
             print(f"Building {name}", flush=True)
             args = [
                 "buildx",
@@ -250,6 +294,11 @@ def main():
         sub.add_argument("--tag", required=True)
         if command == "publish":
             sub.add_argument("--output", type=Path, required=True)
+        sub.add_argument(
+            "--reuse-manifest",
+            type=Path,
+            help="Reuse an unchanged engine and same-source node from a published baseline",
+        )
     consumer = commands.add_parser("pull")
     consumer.add_argument("--manifest", type=Path, required=True)
     consumer.add_argument("--env-file", type=Path, required=True)
@@ -285,6 +334,8 @@ def main():
         pull(root, manifest, args.env_file, docker)
     else:
         planned = plan(root, args.registry, args.namespace, args.tag, revision)
+        if args.reuse_manifest:
+            reuse_images(planned, json.loads(args.reuse_manifest.read_text()))
         if args.command == "plan":
             print(json.dumps(planned, indent=2))
         else:

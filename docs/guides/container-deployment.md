@@ -387,7 +387,9 @@ docker compose --env-file "$VIDEO_ENV" --env-file .engine-images.env -f compose.
 
 Stop the runner before the controller and proxy so it can deregister and deactivate. Managed engines are created by the controller and are not Compose services. Keep state even though the engine container is disposable. Do not change image references, catalog, namespace, GPU, mounts, or engine network while a recorded engine exists: configuration drift intentionally blocks mutation. Deactivate using the old configuration first, then update.
 
-Managed shutdown waits for a controller activation/recovery already in progress,
+Shutdown refuses new admin switches and cancels an in-flight runner switch before
+final deactivation, preventing it from starting an engine after shutdown.
+Managed shutdown waits for a controller activation/recovery already accepted,
 then requests and confirms deactivation. Waiting and deactivation share a
 120-second budget. Both root Compose files give the runner a 150-second stop
 grace period. A controller that remains busy, becomes unavailable or cannot

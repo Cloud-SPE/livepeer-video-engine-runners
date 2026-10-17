@@ -1,12 +1,156 @@
 """Portable, credential-free release manifests and digest-only deployment inputs."""
 
 import json
+import shutil
+from copy import deepcopy
 from pathlib import Path
 import pytest
 
 from video_runners.tools import release
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_release_hashes_nested_files_copied_into_the_engine_image(tmp_path):
+    root = tmp_path / "source"
+    shutil.copytree(
+        ROOT,
+        root,
+        ignore=shutil.ignore_patterns(
+            ".git", ".venv", "artifacts", "__pycache__", ".pytest_cache", ".ruff_cache"
+        ),
+    )
+    baked = root / "configs/lightx2v/nested/preset.json"
+    baked.parent.mkdir()
+    baked.write_text('{"test": true}\n')
+    planned = release.plan(root, "registry.example.com", "operator", "v0.3.0", "a" * 40)
+    assert "configs/lightx2v/nested/preset.json" in planned["input_sha256"]
+
+
+def test_cpu_release_reuses_only_matching_engine_and_node_images_without_rewriting_evidence():
+    previous = release.plan(
+        ROOT, "registry.example.com", "operator", "v0.3.0", "a" * 40
+    )
+    previous.update(
+        status="published",
+        images={
+            name: component["tag"].rsplit(":", 1)[0] + "@sha256:" + "b" * 64
+            for name, component in previous["components"].items()
+        },
+    )
+    original = deepcopy(previous)
+    current = release.plan(ROOT, "registry.example.com", "operator", "v0.3.1", "c" * 40)
+    release.reuse_images(current, previous)
+    assert (
+        current["components"]["lightx2v-engine"]["reuse"]
+        == previous["images"]["lightx2v-engine"]
+    )
+    assert current["components"]["node"]["reuse"] == previous["images"]["node"]
+    assert all(
+        "reuse" not in current["components"][name]
+        for name in ["runner", "controller", "model-tools"]
+    )
+    assert current["components"]["node"]["tag"] == previous["components"]["node"]["tag"]
+    assert (
+        current["components"]["node"]["image_source_revision"]
+        == previous["components"]["node"]["context"].rsplit("#", 1)[1]
+    )
+    assert (
+        current["components"]["lightx2v-engine"]["image_source_revision"]
+        == previous["source_revision"]
+    )
+    assert previous == original
+
+
+@pytest.mark.parametrize(
+    "change", ["incomplete", "base", "source", "config", "missing_config"]
+)
+def test_cpu_reuse_refuses_changed_or_incomplete_engine_build_inputs(change):
+    current = release.plan(ROOT, "registry.example.com", "operator", "v0.3.1", "c" * 40)
+    previous = deepcopy(current)
+    previous.update(
+        status="published",
+        images={
+            name: component["tag"].rsplit(":", 1)[0] + "@sha256:" + "b" * 64
+            for name, component in previous["components"].items()
+        },
+    )
+    if change == "incomplete":
+        previous["status"] = "failed"
+    elif change == "base":
+        previous["engine_inputs"]["lightx2v_base"] = "old/base@sha256:" + "d" * 64
+    elif change == "source":
+        previous["engine_inputs"]["lightx2v_commit"] = "d" * 40
+    else:
+        path = next(
+            name
+            for name in previous["input_sha256"]
+            if name.startswith("configs/lightx2v/")
+        )
+        if change == "config":
+            previous["input_sha256"][path] = "d" * 64
+        else:
+            del previous["input_sha256"][path]
+    with pytest.raises(ValueError, match="engine release"):
+        release.reuse_images(current, previous)
+
+
+def test_changed_node_source_is_rebuilt_while_the_unchanged_engine_is_reused():
+    current = release.plan(ROOT, "registry.example.com", "operator", "v0.3.1", "c" * 40)
+    previous = deepcopy(current)
+    previous.update(
+        status="published",
+        images={
+            name: component["tag"].rsplit(":", 1)[0] + "@sha256:" + "b" * 64
+            for name, component in previous["components"].items()
+        },
+    )
+    previous["components"]["node"]["context"] = (
+        "https://github.com/livepeer/node.git#" + "d" * 40
+    )
+    release.reuse_images(current, previous)
+    assert "reuse" not in current["components"]["node"]
+    assert (
+        current["components"]["lightx2v-engine"]["reuse"]
+        == previous["images"]["lightx2v-engine"]
+    )
+
+
+def test_cpu_publication_never_builds_pulls_or_pushes_reused_engine_and_node(tmp_path):
+    previous = release.plan(
+        ROOT, "registry.example.com", "operator", "v0.3.0", "a" * 40
+    )
+    previous.update(
+        status="published",
+        images={
+            name: component["tag"].rsplit(":", 1)[0] + "@sha256:" + "b" * 64
+            for name, component in previous["components"].items()
+        },
+    )
+    planned = release.plan(ROOT, "registry.example.com", "operator", "v0.3.1", "c" * 40)
+    release.reuse_images(planned, previous)
+    calls = []
+
+    def docker(*args, capture=False):
+        calls.append(args)
+        if args[:2] == ("image", "inspect"):
+            return json.dumps([args[-1].rsplit(":", 1)[0] + "@sha256:" + "e" * 64])
+        return ""
+
+    output = tmp_path / "cpu-release"
+    release.publish(ROOT, planned, output, docker)
+    assert len([call for call in calls if call[0] == "push"]) == 3
+    assert not any(
+        "livepeer-node" in part or "lightx2v-engine" in part
+        for call in calls
+        for part in call
+    )
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert manifest["status"] == "published"
+    assert (
+        manifest["images"]["lightx2v-engine"] == previous["images"]["lightx2v-engine"]
+    )
+    assert manifest["images"]["node"] == previous["images"]["node"]
 
 
 def test_release_plan_separates_cpu_roles_from_gpu_engine_and_pins_node_source():

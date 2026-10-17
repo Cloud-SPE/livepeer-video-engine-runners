@@ -14,6 +14,10 @@ external data. The broader provider-platform rewrite stays deferred.
   Never bake weights into CPU images or merge node/runner roles.
 - Source/version tags plus digest-only deployment manifests, with no `latest`.
   Reuse the same prod/dev Compose entry points; retain local build defaults.
+- Normal CPU CI runs on a GitHub-hosted worker and reuses the complete matching
+  engine baseline; unchanged node source also reuses its prior image. An initial
+  or changed-engine bundle is explicitly published from a suitable build machine.
+  No self-hosted CI worker service is needed for routine CPU releases.
 - Metrics use the existing authenticated admin listener, not public generation.
   Do not deploy another monitoring stack or change host exporters.
 - Graceful switching waits up to 120 seconds for active work. Expiry refuses the
@@ -35,9 +39,12 @@ external data. The broader provider-platform rewrite stays deferred.
 - [x] Stop error/timeout fails closed; deliberate skipped-stop mutation is rejected.
 - [x] A persistent task cancelled before its first instruction releases its GPU reservation.
 - [x] Admin force flags require JSON booleans; concurrent/external-mode restrictions remain.
+- [x] Shutdown cancels pending admin switches and refuses new switches before final deactivation.
 - [x] Release roles/inputs are pinned and credentials/mutable refs are refused.
 - [x] Publishing records registry digests and exports reusable Compose inputs.
 - [x] Incomplete manifests cannot be pulled/deployed.
+- [x] CPU publication skips reused engine/node builds, pulls and pushes; changed
+      engine inputs refuse reuse and changed node source triggers a CPU rebuild.
 - [x] Full CPU/format/package/Compose checks and real managed/bundled fixture verification.
 - [ ] Local source checkpoint, registry publication and digest-based pull/CLI verification.
 
@@ -45,5 +52,5 @@ The [release guide](../../guides/container-releases.md),
 [monitoring guide](../../guides/monitoring.md) and canonical
 [switching procedure](../../guides/container-deployment.md#generate-inspect-and-switch)
 own operating instructions. The [dated report](../../validation/reports/operator-release-2026-10-17.md)
-records 235 CPU tests, 37 Compose configurations, fresh wheel installation,
+records 246 CPU tests, 37 Compose configurations, fresh wheel installation,
 16 decoded fixture clips, cleanup and the remaining publication boundary.

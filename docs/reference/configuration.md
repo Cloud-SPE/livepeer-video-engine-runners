@@ -231,14 +231,15 @@ Source: [tools/prepare_weights.py](../../src/video_runners/tools/prepare_weights
 
 Source: [tools/release.py](../../src/video_runners/tools/release.py).
 
-| Argument      | Choices | Default | Requirement / action |
-| ------------- | ------- | ------- | -------------------- |
-| `--manifest`  | —       | `None`  | Required             |
-| `--env-file`  | —       | `None`  | Required             |
-| `--registry`  | —       | `None`  | Required             |
-| `--namespace` | —       | `None`  | Required             |
-| `--tag`       | —       | `None`  | Required             |
-| `--output`    | —       | `None`  | Required             |
+| Argument           | Choices | Default | Requirement / action |
+| ------------------ | ------- | ------- | -------------------- |
+| `--manifest`       | —       | `None`  | Required             |
+| `--env-file`       | —       | `None`  | Required             |
+| `--registry`       | —       | `None`  | Required             |
+| `--namespace`      | —       | `None`  | Required             |
+| `--tag`            | —       | `None`  | Required             |
+| `--reuse-manifest` | —       | `None`  | —                    |
+| `--output`         | —       | `None`  | Required             |
 
 ### python3 src/video_runners/tools/validate_all.py
 

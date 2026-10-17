@@ -64,6 +64,7 @@ class Runner:
     closing: bool = False
     recovery: asyncio.Task | None = None
     active_job: asyncio.Task | None = None
+    switch_task: asyncio.Task | None = None
     metrics: Metrics = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -87,6 +88,8 @@ class Runner:
         self.available = True
 
     async def switch(self, model_id: str, *, force: bool = False) -> None:
+        if self.closing:
+            raise Busy("runner is shutting down")
         if model_id not in self.models:
             raise ValueError(f"unknown model {model_id!r}")
         if not self.supervisor.supports_switching:
@@ -97,6 +100,7 @@ class Runner:
             previous = self.spec.id
             if model_id == previous and self.available and not force:
                 return
+            self.switch_task = asyncio.current_task()
             was_available = self.available
             self.switching = True
             self.available = False
@@ -181,6 +185,7 @@ class Runner:
                         was_available and not self.needs_reset and not self.closing
                     )
                 self.switching = False
+                self.switch_task = None
 
     async def monitor_engine(self, interval: float = 2) -> None:
         failures = 0
@@ -232,14 +237,20 @@ class Runner:
     async def shutdown(self) -> None:
         self.closing = True
         self.available = False
-        if self.recovery is not None and not self.recovery.done():
-            self.recovery.cancel()
-            with suppress(asyncio.CancelledError):
-                await self.recovery
-        await self._unregister()
-        for session in list(self.sessions.values()):
-            await session.close()
-        await self.supervisor.stop()
+        for task in (self.recovery, self.switch_task):
+            if (
+                task is not None
+                and task is not asyncio.current_task()
+                and not task.done()
+            ):
+                task.cancel()
+                with suppress(asyncio.CancelledError, Exception):
+                    await task
+        async with self.lifecycle_lock:
+            await self._unregister()
+            for session in list(self.sessions.values()):
+                await session.close()
+            await self.supervisor.stop()
 
     async def _register(self, spec: ModelSpec) -> None:
         common = dict(

@@ -49,7 +49,7 @@ fixture, bundled and external recipes. This adds no GPU or paid-operation eviden
 
 ## Recorded hardware and payment evidence
 
-The [operator release checks](reports/operator-release-2026-10-17.md) add 235 CPU
+The [operator release checks](reports/operator-release-2026-10-17.md) add 246 CPU
 tests, 37 Compose configurations, fresh wheel installation, and managed/bundled
 Docker checks with 16 decoded fixture clips and verified cleanup. Private metrics
 and bounded/explicit-force switching have CPU evidence. No new GPU or paid work

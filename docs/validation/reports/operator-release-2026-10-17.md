@@ -24,11 +24,17 @@ Deliberately skipping stop verification made both protective tests fail; the
 production source was restored. Model-load/rollback bounds remain profile-specific.
 This is CPU evidence, not fresh hardware timing or fault-injection evidence.
 
+Two additional regressions first reproduced an admin switch activating a
+replacement after shutdown and acceptance of a new switch while closing.
+Shutdown now cancels the in-flight runner switch before final deactivation and
+refuses new switches. Both regressions passed with the correction; accepted
+controller operations still use managed shutdown's bounded reconciliation.
+
 ## Verification results
 
 | Check                                                          | Result                                                                                                                                 |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Fast repository/configuration/import/Black/Ruff/CPU suite      | 235 tests passed                                                                                                                       |
+| Fast repository/configuration/import/Black/Ruff/CPU suite      | 246 tests passed                                                                                                                       |
 | Formatting, whitespace, YAML and merge markers                 | Passed on changed files                                                                                                                |
 | Compose configuration matrix                                   | 37 configurations resolved                                                                                                             |
 | Fresh wheel installation and four entrypoints outside checkout | Passed                                                                                                                                 |
@@ -51,9 +57,20 @@ It preserves completed-image evidence if later publication fails. Unit tests
 verify role separation, invalid/credential-bearing inputs, digest-only output,
 incomplete-manifest refusal and preservation of existing deployment settings.
 
-Actual registry publication is pending the clean local source checkpoint and
-the ongoing local base-image preparation. No images are claimed published here
-yet. The manually triggered GitHub workflow is prepared; its separate build
-worker, registry settings/secrets and remote activation are not implied by a
-successful local build. Operating instructions remain generic in the
+The initial clean source checkpoint is `0c33f45`. Its four CPU images have
+published successfully and passed entrypoint checks; the one-time LightX2V
+baseline is still building. No complete release bundle is claimed yet.
+
+The subsequent CPU publication path has 22 release unit cases and 246 full CPU
+tests passing. Tests observed missing reuse, changed-input refusal, node rebuild
+selection, skip-build behavior and recursive baked-configuration hashing fail
+before implementation. It reuses the engine only when all recorded engine build
+inputs match, and reuses node only at the same upstream source. The old manifest
+is preserved, with original image tags/source provenance retained in the new one.
+Normal CI uses a hosted CPU worker and does not pull/build/push the GPU engine.
+No self-hosted build-worker service was installed.
+
+The manually triggered GitHub workflow is prepared; registry settings/secrets,
+the complete baseline manifest variable and remote activation are not implied by
+a successful local build. Operating instructions remain generic in the
 [release guide](../../guides/container-releases.md).

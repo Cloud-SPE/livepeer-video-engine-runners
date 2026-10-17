@@ -92,8 +92,10 @@ project ports and paths.
 ## Container publication
 
 The explicit [release workflow](../../.github/workflows/release.yml) runs fast
-checks and Compose resolution on a separately configured Docker build worker,
-then checks CPU image entrypoints and publishes digest references. It is not
+checks, Compose resolution and engine-baseline compatibility on a GitHub-hosted
+CPU worker, then checks CPU image entrypoints and publishes digest references.
+It reuses matching engine/node digests without pulling GPU layers. Initial or
+changed-engine publication is a separate explicit operator action. It is not
 part of routine CI or a hardware gate. The [release guide](../guides/container-releases.md)
 defines registry credentials, build storage, manifests and pull-only deployment.
 Publication starts no inference, signer or paid request. Before a production
