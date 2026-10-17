@@ -132,6 +132,13 @@ class Runner:
                     continue
                 try:
                     healthy = await self.supervisor.healthy(self.client)
+                    if self.gpu.locked():
+                        # Unregistering also cancels the node's active requests.
+                        # Keep their registration through a transient probe loss;
+                        # the job deadline and uncertain-job recovery still apply.
+                        self.available = healthy and bool(self.registrations)
+                        failures = 0 if healthy else failures + 1
+                        continue
                     if not healthy:
                         failures += 1
                         self.available = False
@@ -160,7 +167,8 @@ class Runner:
                         "engine health or registration check failed; retrying"
                     )
                     self.available = False
-                    await self._unregister()
+                    if not self.gpu.locked():
+                        await self._unregister()
 
     async def shutdown(self) -> None:
         self.closing = True

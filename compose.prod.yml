@@ -2,6 +2,7 @@
 services:
   runner:
     restart: unless-stopped
+    stop_grace_period: 150s
     build:
       context: .
       dockerfile: deploy/docker/cpu.Dockerfile

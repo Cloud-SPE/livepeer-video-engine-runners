@@ -17,11 +17,38 @@ from video_runners.backends import engine_client
 from video_runners.catalog import load_catalog
 from video_runners.lifecycle.external import ExternalSupervisor
 from video_runners.lifecycle.managed import ManagedSupervisor
+import video_runners.lifecycle.managed as managed
 from video_runners.origins import engine_url
 from video_runners.runner.protocol import Busy
 from video_runners.runner.service import Runner
 
 MODELS, _ = load_catalog(Path(__file__).resolve().parents[2] / "models/stub.json")
+
+
+def test_managed_shutdown_timeout_does_not_claim_the_engine_stopped(monkeypatch):
+    async def scenario():
+        app = web.Application()
+        deactivations = []
+
+        async def status(_):
+            return web.json_response({"phase": "recovering"})
+
+        async def deactivate(_):
+            deactivations.append(True)
+            return web.json_response({"state": "succeeded"})
+
+        app.router.add_get("/v1/status", status)
+        app.router.add_post("/v1/deactivate", deactivate)
+        async with TestServer(app) as server, aiohttp.ClientSession() as http:
+            supervisor = ManagedSupervisor(str(server.make_url("/")), "token", http)
+            supervisor.running = True
+            with pytest.raises(EngineError, match="shutdown timed out.*unknown"):
+                await asyncio.wait_for(supervisor.stop(), 0.5)
+            assert supervisor.running
+            assert not deactivations
+
+    monkeypatch.setattr(managed, "SHUTDOWN_TIMEOUT_S", 0.02)
+    asyncio.run(scenario())
 
 
 def test_unavailable_owned_engine_recovers_without_operator_restart():
@@ -113,6 +140,60 @@ def test_health_recovery_waits_for_gpu_work_to_finish():
                     await monitor
                 if runner.recovery:
                     await runner.recovery
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("probe_error", [False, True])
+def test_transient_health_loss_keeps_active_request_registered(probe_error):
+    async def scenario():
+        ready = False
+        checks = asyncio.Queue()
+        check_permitted = asyncio.Event()
+        check_permitted.set()
+        closed = []
+
+        class Supervisor(EngineSupervisor):
+            async def healthy(self, client):
+                await check_permitted.wait()
+                check_permitted.clear()
+                checks.put_nowait(ready)
+                if probe_error and not ready:
+                    raise ConnectionError("health probe temporarily unavailable")
+                return ready
+
+        class Registration:
+            async def close(self):
+                closed.append(True)
+
+        async with aiohttp.ClientSession() as http:
+            supervisor = Supervisor()
+            supervisor.spec = MODELS["stub-wan-t2v"]
+            runner = Runner(argparse.Namespace(), MODELS, http, supervisor=supervisor)
+            runner.client = engine_client(supervisor.spec, http)
+            registration = Registration()
+            runner.registrations["single-shot"] = registration
+            runner.available = True
+            await runner.gpu.acquire()
+            monitor = asyncio.create_task(runner.monitor_engine(0))
+            try:
+                assert await asyncio.wait_for(checks.get(), 1) is False
+                assert not closed, "withdrawing registration cancels the active request"
+                assert runner.registrations["single-shot"] is registration
+                assert not runner.available
+                ready = True
+                check_permitted.set()
+                assert await asyncio.wait_for(checks.get(), 1) is True
+                assert (
+                    not closed
+                ), "health recovery must also preserve the active request"
+                assert runner.registrations["single-shot"] is registration
+                assert runner.available
+            finally:
+                monitor.cancel()
+                with suppress(asyncio.CancelledError):
+                    await monitor
+                runner.gpu.release()
 
     asyncio.run(scenario())
 

@@ -1,9 +1,10 @@
 """Exercise lifecycle policy against a recording daemon, never the host socket."""
 
 import asyncio
+import argparse
 import copy
 import json
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import aiohttp
 import pytest
@@ -14,6 +15,7 @@ from video_runners.controller.service import Controller
 from video_runners.controller.policy import MODEL, OWNER, Policy
 from video_runners.controller.http import create_app
 from video_runners.lifecycle.managed import ManagedSupervisor
+from video_runners.runner.service import Runner
 
 TOKEN = "test-controller-secret-" + "a" * 32
 HEADERS = {"Authorization": "Bearer " + TOKEN}
@@ -122,6 +124,73 @@ async def activate(client, controller, model, operation_id):
     assert response.status == 202, await response.text()
     await controller.task
     return controller.state["operations"][operation_id]
+
+
+def test_runner_shutdown_deactivates_an_in_progress_managed_replacement(tmp_path):
+    async def scenario():
+        async with setup(tmp_path) as (client, controller, daemon, http):
+            await activate(client, controller, "first", "initial")
+            starting = asyncio.Event()
+            finish_starting = asyncio.Event()
+            original_ready = controller.ready
+
+            async def delayed_ready(model):
+                starting.set()
+                await finish_starting.wait()
+                return await original_ready(model)
+
+            controller.ready = delayed_ready
+            supervisor = ManagedSupervisor(str(client.make_url("/")), TOKEN, http)
+            supervisor.running = True
+            runner = Runner(argparse.Namespace(), {}, http, supervisor=supervisor)
+            runner.recovery = asyncio.create_task(
+                supervisor.operation("activate", "first", 10)
+            )
+            await asyncio.wait_for(starting.wait(), 1)
+
+            async def finish_replacement():
+                # Model loading outlives the client's three short POST retries.
+                await asyncio.sleep(3)
+                finish_starting.set()
+
+            completing = asyncio.create_task(finish_replacement())
+            try:
+                await asyncio.wait_for(runner.shutdown(), 6)
+                assert runner.recovery.cancelled()
+                assert not supervisor.running
+                assert controller.phase == "idle"
+                assert controller.state["enabled"] is False
+                assert not controller.state["containers"]
+                assert not daemon.containers
+            finally:
+                finish_starting.set()
+                completing.cancel()
+                with suppress(asyncio.CancelledError):
+                    await completing
+                if controller.task:
+                    await controller.task
+
+    asyncio.run(scenario())
+
+
+def test_managed_shutdown_deactivates_after_controller_recovery_fails(
+    tmp_path, monkeypatch
+):
+    async def scenario():
+        async with setup(tmp_path) as (client, controller, daemon, http):
+            await activate(client, controller, "first", "initial")
+            controller.phase, controller.error = "error", "recovery failed"
+            supervisor = ManagedSupervisor(str(client.make_url("/")), TOKEN, http)
+            supervisor.running = True
+            await asyncio.wait_for(supervisor.stop(), 3)
+            assert not supervisor.running
+            assert controller.phase == "idle"
+            assert not daemon.containers
+            assert not controller.state["containers"]
+            assert controller.state["enabled"] is False
+
+    monkeypatch.setattr("video_runners.lifecycle.managed.SHUTDOWN_TIMEOUT_S", 2)
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize(

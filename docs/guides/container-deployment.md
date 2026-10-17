@@ -338,6 +338,13 @@ External mode launches the same configured model as the runner, monitors backend
 
 After three consecutive failed health checks, managed and bundled modes also attempt one owned-engine reset once the GPU job lock is idle. New work stays unavailable during recovery. A failed reset remains unavailable for operator inspection instead of looping through model restarts. External mode continues to wait for its operator-owned backend.
 
+During active GPU work, a failed health probe blocks new admission but preserves
+the existing registrations. Unregistering would make the node cancel its active
+request, including work that is still loading model weights. Health recovery
+restores availability without replacing those registrations. Once the GPU lock
+is idle, normal withdrawal/recovery applies. Engine job deadlines, explicit
+cancellation and uncertain-job reset requirements still apply.
+
 ## Stop, restart, and update
 
 ```sh
@@ -348,6 +355,14 @@ docker compose --env-file "$VIDEO_ENV" --env-file .engine-images.env -f compose.
 ```
 
 Stop the runner before the controller and proxy so it can deregister and deactivate. Managed engines are created by the controller and are not Compose services. Keep state even though the engine container is disposable. Do not change image references, catalog, namespace, GPU, mounts, or engine network while a recorded engine exists: configuration drift intentionally blocks mutation. Deactivate using the old configuration first, then update.
+
+Managed shutdown waits for a controller activation/recovery already in progress,
+then requests and confirms deactivation. Waiting and deactivation share a
+120-second budget. Both root Compose files give the runner a 150-second stop
+grace period. A controller that remains busy, becomes unavailable or cannot
+deactivate causes a visible shutdown error; it does not establish that its engine
+is stopped. Inspect controller status and recorded owned resources before
+stopping the controller/proxy or reusing the GPU.
 
 After a startup/recovery failure, an authenticated controller deactivation is
 allowed once the in-progress operation has ended. It still verifies every

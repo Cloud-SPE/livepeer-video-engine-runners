@@ -15,6 +15,7 @@ import aiohttp
 from video_runners.diagnostics import event
 
 log = logging.getLogger("managed-engine")
+SHUTDOWN_TIMEOUT_S = 120
 
 
 class ManagedSupervisor:
@@ -156,5 +157,18 @@ class ManagedSupervisor:
         return self.running
 
     async def stop(self) -> None:
-        await self.operation("deactivate", None, 120)
-        self.running = False
+        try:
+            async with asyncio.timeout(SHUTDOWN_TIMEOUT_S):
+                # Canceling the runner's recovery task does not cancel an
+                # activation already accepted by the remote controller.
+                while True:
+                    status = await self.request("GET", "/v1/status")
+                    if status["phase"] in {"idle", "ready", "error"}:
+                        await self.operation("deactivate", None, SHUTDOWN_TIMEOUT_S)
+                        self.running = False
+                        return
+                    await asyncio.sleep(0.5)
+        except TimeoutError as exc:
+            raise EngineError(
+                "controller shutdown timed out; engine state remains unknown"
+            ) from exc
