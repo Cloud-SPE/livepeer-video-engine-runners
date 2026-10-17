@@ -1,7 +1,7 @@
 # Operator release and lifecycle checks — 2026-10-17
 
 This records the scoped release/metrics/switching work in the
-[execution plan](../../plans/active/operator-release.md). GPU work remains
+[execution plan](../../plans/active/operator-release.md). GPU inference remains
 stopped. The hardware host was inspected read-only: no video trial container or
 staging directory remained, six protected external volumes remained present,
 and unrelated workloads/services were left untouched. No model/cache/wallet/key
@@ -77,8 +77,10 @@ That attempt also built a roughly 36 GiB LightX2V image and began an engine
 upload. The upload was stopped after the operator clarified the release boundary.
 The old combined attempt is retained as failed evidence and produced no complete
 deployment env. Its format and engine publication path are removed from the
-current publisher. The operator's existing local LightX2V preparation recipe is
-unchanged. No registry or daemon pruning was performed.
+current publisher. A read-only registry lookup confirmed that the interrupted
+engine tag was not published. Partially uploaded layers remain subject to registry
+retention/garbage collection; no registry or daemon pruning was performed. The
+operator's existing local LightX2V preparation recipe is unchanged.
 
 The corrected path has 25 release unit cases passing. An acceptance regression
 first reproduced the unwanted LightX2V build in a normal application release.
@@ -86,14 +88,20 @@ Tests now verify cold CPU publication, exact CPU-only env/pulls, missing engine
 build files, preservation of operator settings, node provenance and refusal of
 combined GPU bundles before any Docker action. Deliberately removing the CPU
 publication guard and adding an engine pull each made its protective test fail;
-the production source was restored. Earlier GPU-baseline assertions were replaced
-because that release requirement was explicitly retired, rather than weakened
-as a workaround for a failure.
+the production source was restored. Tests that required engine-bundle publication
+were updated to the approved CPU-only contract. Runtime/lifecycle regression
+assertions remain unchanged.
 
 The corrected CPU-only path passes all 249 CPU tests and 37 Compose
-configurations. Corrected registry publication will be recorded after its
-digest-pull and entrypoint verification. Operating instructions remain generic
-in the [release guide](../../guides/container-releases.md). The manually triggered
+configurations. A complete CPU release from clean source `604d87b` published
+all four CPU images. The actual pull CLI retrieved exactly those four registry
+digests and produced only the four CPU env keys; operator engine settings were
+unchanged. Each image passed digest/tag identity matching, source-label checks
+and entrypoint checks with `runc` and no network. No GPU engine was built,
+pulled, pushed or executed by the corrected release. Private manifest/env and
+per-image verification receipts preserve its exact references and provenance.
+
+Operating instructions remain generic in the [release guide](../../guides/container-releases.md). The manually triggered
 hosted CPU workflow is prepared; remote activation and registry settings/secrets
 are separate actions. Optional node reuse does not require an engine baseline.
 No self-hosted build-worker service was installed.

@@ -53,7 +53,8 @@ The [operator release checks](reports/operator-release-2026-10-17.md) add 249 CP
 tests, 37 Compose configurations, fresh wheel installation, and managed/bundled
 Docker checks with 16 decoded fixture clips and verified cleanup. Private metrics
 and bounded/explicit-force switching have CPU evidence. No new GPU or paid work
-was run; registry publication status is recorded separately in that report.
+was run. Four-role CPU publication, actual digest pulls and offline entrypoints
+also passed; the report records the interrupted earlier engine publication.
 
 | Area                                             | Status                           | Evidence and scope                                                                                                                                                                                         |
 | ------------------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

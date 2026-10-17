@@ -49,11 +49,11 @@ external data. The broader provider-platform rewrite stays deferred.
 - [x] Optional node reuse retains provenance; incompatible/legacy GPU bundles are refused before Docker actions.
 - [x] Full CPU/format/package/Compose checks and real managed/bundled fixture verification.
 - [x] Clean-source managed CPU rerun passed after heavy extraction ended; the earlier failed receipt is retained.
-- [ ] Local source checkpoint, registry publication and digest-based pull/CLI verification.
+- [x] Local source checkpoint, four-role CPU registry publication and actual digest-based pull/CLI verification.
 
 The [release guide](../../guides/container-releases.md),
 [monitoring guide](../../guides/monitoring.md) and canonical
 [switching procedure](../../guides/container-deployment.md#generate-inspect-and-switch)
 own operating instructions. The [dated report](../../validation/reports/operator-release-2026-10-17.md)
 records 249 CPU tests, 37 Compose configurations, fresh wheel installation,
-16 decoded fixture clips, cleanup and the remaining publication boundary.
+16 decoded fixture clips, verified cleanup and CPU-only registry digest/CLI evidence.
