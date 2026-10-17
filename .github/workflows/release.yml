@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   publish:
-    # Reuse the validated engine without pulling its large GPU layers here.
+    # CPU images only; operators prepare GPU engines on their own hosts.
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -27,9 +27,9 @@ jobs:
         run: |
           scripts/check.sh
           tests/e2e/compose-config.sh
-      - name: Read the pinned engine baseline
+      - name: Preview CPU release and optional node reuse
         env:
-          BASE_RELEASE_MANIFEST: ${{ vars.CONTAINER_BASE_RELEASE_MANIFEST }}
+          NODE_RELEASE_MANIFEST: ${{ vars.CONTAINER_NODE_RELEASE_MANIFEST }}
           REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
           NAMESPACE: ${{ vars.CONTAINER_NAMESPACE }}
           RELEASE_TAG: ${{ inputs.tag }}
@@ -37,18 +37,19 @@ jobs:
           python3 - <<'PY'
           import json, os
           from pathlib import Path
-          raw = os.environ['BASE_RELEASE_MANIFEST']
-          if not raw:
-              raise SystemExit('Configure CONTAINER_BASE_RELEASE_MANIFEST with a complete published baseline')
-          value = json.loads(raw)
-          directory = Path('artifacts/release-inputs')
-          directory.mkdir(parents=True)
-          (directory / 'baseline.json').write_text(json.dumps(value))
+          raw = os.environ['NODE_RELEASE_MANIFEST']
+          if raw:
+              directory = Path('artifacts/release-inputs')
+              directory.mkdir(parents=True)
+              (directory / 'node.json').write_text(json.dumps(json.loads(raw)))
           PY
+          reuse=()
+          if [ -f artifacts/release-inputs/node.json ]; then
+            reuse=(--reuse-manifest artifacts/release-inputs/node.json)
+          fi
           python3 src/video_runners/tools/release.py plan \
             --registry "$REGISTRY" --namespace "$NAMESPACE" \
-            --tag "$RELEASE_TAG" \
-            --reuse-manifest artifacts/release-inputs/baseline.json > /dev/null
+            --tag "$RELEASE_TAG" "${reuse[@]}" > /dev/null
       - name: Log in to the operator registry
         env:
           REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
@@ -63,10 +64,14 @@ jobs:
           NAMESPACE: ${{ vars.CONTAINER_NAMESPACE }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
+          reuse=()
+          if [ -f artifacts/release-inputs/node.json ]; then
+            reuse=(--reuse-manifest artifacts/release-inputs/node.json)
+          fi
           python3 src/video_runners/tools/release.py publish \
             --registry "$REGISTRY" --namespace "$NAMESPACE" \
             --tag "$RELEASE_TAG" --output artifacts/container-release \
-            --reuse-manifest artifacts/release-inputs/baseline.json
+            "${reuse[@]}"
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

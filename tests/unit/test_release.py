@@ -11,23 +11,99 @@ from video_runners.tools import release
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_release_hashes_nested_files_copied_into_the_engine_image(tmp_path):
-    root = tmp_path / "source"
-    shutil.copytree(
-        ROOT,
-        root,
-        ignore=shutil.ignore_patterns(
-            ".git", ".venv", "artifacts", "__pycache__", ".pytest_cache", ".ruff_cache"
-        ),
+def test_application_release_publishes_only_cpu_roles_without_an_engine_baseline(
+    tmp_path,
+):
+    planned = release.plan(ROOT, "registry.example.com", "operator", "v0.3.0", "a" * 40)
+    calls = []
+
+    def docker(*args, capture=False):
+        calls.append(args)
+        if args[:2] == ("image", "inspect"):
+            return json.dumps([args[-1].rsplit(":", 1)[0] + "@sha256:" + "b" * 64])
+        return ""
+
+    output = tmp_path / "cpu-release"
+    release.publish(ROOT, planned, output, docker)
+    assert set(planned["components"]) == {"runner", "controller", "model-tools", "node"}
+    assert len([call for call in calls if call[0] == "push"]) == 4
+    assert not any(
+        engine in part.lower()
+        for call in calls
+        for part in call
+        for engine in ("lightx2v", "sglang", "vllm")
     )
-    baked = root / "configs/lightx2v/nested/preset.json"
-    baked.parent.mkdir()
-    baked.write_text('{"test": true}\n')
-    planned = release.plan(root, "registry.example.com", "operator", "v0.3.0", "a" * 40)
-    assert "configs/lightx2v/nested/preset.json" in planned["input_sha256"]
+    values = dict(
+        line.split("=", 1)
+        for line in (output / "release.env").read_text().splitlines()
+        if line and not line.startswith("#")
+    )
+    assert set(values) == {
+        "RUNNER_IMAGE",
+        "CONTROLLER_IMAGE",
+        "MODEL_TOOLS_IMAGE",
+        "LIVEPEER_NODE_IMAGE",
+    }
 
 
-def test_cpu_release_reuses_only_matching_engine_and_node_images_without_rewriting_evidence():
+@pytest.mark.parametrize("action", ["publish", "pull"])
+def test_gpu_bundle_is_refused_before_any_docker_action(tmp_path, action):
+    manifest = release.plan(
+        ROOT, "registry.example.com", "operator", "v0.3.0", "a" * 40
+    )
+    manifest["components"]["lightx2v-engine"] = {
+        "tag": "registry.example.com/operator/engine:v0.3.0",
+        "context": ".",
+        "dockerfile": "deploy/docker/lightx2v-engine.Dockerfile",
+    }
+    manifest.update(
+        status="published",
+        images={
+            name: value["tag"].rsplit(":", 1)[0] + "@sha256:" + "b" * 64
+            for name, value in manifest["components"].items()
+        },
+    )
+    calls = []
+
+    def docker(*args, capture=False):
+        calls.append(args)
+        if args[:2] == ("image", "inspect"):
+            return json.dumps([args[-1].rsplit(":", 1)[0] + "@sha256:" + "b" * 64])
+        return ""
+
+    with pytest.raises(ValueError, match="CPU-only"):
+        getattr(release, action)(ROOT, manifest, tmp_path / "output", docker)
+    assert not calls
+    assert not (tmp_path / "output").exists()
+
+
+def test_cpu_release_needs_no_operator_engine_build_files(tmp_path):
+    files = [
+        "pyproject.toml",
+        "uv.lock",
+        "configs/model-assets.json",
+        "compose.prod.yml",
+        "compose.dev.yml",
+        "deploy/compose/signer.yml",
+        "deploy/compose/assets.yml",
+        "deploy/docker/cpu.Dockerfile",
+    ]
+    files += [
+        str(p.relative_to(ROOT))
+        for folder in ("models", "configs/controller")
+        for p in (ROOT / folder).glob("*.json")
+    ]
+    for name in files:
+        destination = tmp_path / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, destination)
+    planned = release.plan(
+        tmp_path, "registry.example.com", "operator", "v0.3.0", "a" * 40
+    )
+    assert set(planned["components"]) == {"runner", "controller", "model-tools", "node"}
+
+
+def test_cpu_release_optionally_reuses_only_the_same_source_node_without_rewriting_evidence():
     previous = release.plan(
         ROOT, "registry.example.com", "operator", "v0.3.0", "a" * 40
     )
@@ -41,10 +117,6 @@ def test_cpu_release_reuses_only_matching_engine_and_node_images_without_rewriti
     original = deepcopy(previous)
     current = release.plan(ROOT, "registry.example.com", "operator", "v0.3.1", "c" * 40)
     release.reuse_images(current, previous)
-    assert (
-        current["components"]["lightx2v-engine"]["reuse"]
-        == previous["images"]["lightx2v-engine"]
-    )
     assert current["components"]["node"]["reuse"] == previous["images"]["node"]
     assert all(
         "reuse" not in current["components"][name]
@@ -55,17 +127,13 @@ def test_cpu_release_reuses_only_matching_engine_and_node_images_without_rewriti
         current["components"]["node"]["image_source_revision"]
         == previous["components"]["node"]["context"].rsplit("#", 1)[1]
     )
-    assert (
-        current["components"]["lightx2v-engine"]["image_source_revision"]
-        == previous["source_revision"]
-    )
     assert previous == original
 
 
 @pytest.mark.parametrize(
-    "change", ["incomplete", "base", "source", "config", "missing_config"]
+    "change", ["incomplete", "schema", "scope", "missing_role", "digest"]
 )
-def test_cpu_reuse_refuses_changed_or_incomplete_engine_build_inputs(change):
+def test_node_reuse_refuses_incomplete_or_non_cpu_release_manifests(change):
     current = release.plan(ROOT, "registry.example.com", "operator", "v0.3.1", "c" * 40)
     previous = deepcopy(current)
     previous.update(
@@ -77,25 +145,19 @@ def test_cpu_reuse_refuses_changed_or_incomplete_engine_build_inputs(change):
     )
     if change == "incomplete":
         previous["status"] = "failed"
-    elif change == "base":
-        previous["engine_inputs"]["lightx2v_base"] = "old/base@sha256:" + "d" * 64
-    elif change == "source":
-        previous["engine_inputs"]["lightx2v_commit"] = "d" * 40
+    elif change == "schema":
+        previous["schema_version"] = 1
+    elif change == "scope":
+        previous["scope"] = "engines"
+    elif change == "missing_role":
+        del previous["images"]["controller"]
     else:
-        path = next(
-            name
-            for name in previous["input_sha256"]
-            if name.startswith("configs/lightx2v/")
-        )
-        if change == "config":
-            previous["input_sha256"][path] = "d" * 64
-        else:
-            del previous["input_sha256"][path]
-    with pytest.raises(ValueError, match="engine release"):
+        previous["images"]["node"] = "untrusted-node:latest"
+    with pytest.raises(ValueError, match="release"):
         release.reuse_images(current, previous)
 
 
-def test_changed_node_source_is_rebuilt_while_the_unchanged_engine_is_reused():
+def test_changed_node_source_is_rebuilt():
     current = release.plan(ROOT, "registry.example.com", "operator", "v0.3.1", "c" * 40)
     previous = deepcopy(current)
     previous.update(
@@ -110,13 +172,9 @@ def test_changed_node_source_is_rebuilt_while_the_unchanged_engine_is_reused():
     )
     release.reuse_images(current, previous)
     assert "reuse" not in current["components"]["node"]
-    assert (
-        current["components"]["lightx2v-engine"]["reuse"]
-        == previous["images"]["lightx2v-engine"]
-    )
 
 
-def test_cpu_publication_never_builds_pulls_or_pushes_reused_engine_and_node(tmp_path):
+def test_cpu_publication_never_builds_pulls_or_pushes_the_reused_node(tmp_path):
     previous = release.plan(
         ROOT, "registry.example.com", "operator", "v0.3.0", "a" * 40
     )
@@ -147,20 +205,16 @@ def test_cpu_publication_never_builds_pulls_or_pushes_reused_engine_and_node(tmp
     )
     manifest = json.loads((output / "manifest.json").read_text())
     assert manifest["status"] == "published"
-    assert (
-        manifest["images"]["lightx2v-engine"] == previous["images"]["lightx2v-engine"]
-    )
     assert manifest["images"]["node"] == previous["images"]["node"]
 
 
-def test_release_plan_separates_cpu_roles_from_gpu_engine_and_pins_node_source():
+def test_release_plan_contains_only_cpu_roles_and_pins_node_source():
     plan = release.plan(ROOT, "registry.example.com", "operator", "v0.3.0", "a" * 40)
     assert set(plan["components"]) == {
         "runner",
         "controller",
         "node",
         "model-tools",
-        "lightx2v-engine",
     }
     for name in ("runner", "controller", "model-tools"):
         assert plan["components"][name]["target"] == name
@@ -173,9 +227,9 @@ def test_release_plan_separates_cpu_roles_from_gpu_engine_and_pins_node_source()
         plan["components"]["node"]["context"]
         == "https://github.com/livepeer/node.git#08081dbda0f4f7b56e362e3af4b6965bfa1b73a4"
     )
-    assert plan["engine_inputs"] == json.loads(
-        (ROOT / "configs/engine-images.json").read_text()
-    )
+    assert plan["schema_version"] == 2 and plan["scope"] == "cpu"
+    assert "engine_inputs" not in plan
+    assert "deploy/docker/lightx2v-engine.Dockerfile" not in plan["input_sha256"]
     assert plan["source_revision"] == "a" * 40
 
 
@@ -227,13 +281,8 @@ def test_publish_records_registry_digests_and_exports_reusable_compose_inputs(tm
         + "b" * 64
         in env
     )
-    assert (
-        "LIGHTX2V_ENGINE_IMAGE=registry.example.com/operator/livepeer-video-lightx2v-engine@sha256:"
-        + "b" * 64
-        in env
-    )
-    assert "SGLANG_ENGINE_IMAGE=" + planned["engine_inputs"]["sglang"] in env
-    assert len([call for call in calls if call[0] == "push"]) == 5
+    assert "_ENGINE_IMAGE=" not in env
+    assert len([call for call in calls if call[0] == "push"]) == 4
     assert not any("login" in call for call in calls)
 
 
@@ -283,14 +332,17 @@ def test_pull_stages_exact_digests_and_preserves_existing_env_files(tmp_path):
         },
     }
     calls = []
+    engines = tmp_path / ".engine-images.env"
+    engine_values = "LIGHTX2V_ENGINE_IMAGE=sha256:" + "c" * 64 + "\n"
+    engines.write_text(engine_values)
     destination = tmp_path / "selected.env"
     release.pull(
         ROOT, manifest, destination, lambda *args, **kwargs: calls.append(args)
     )
-    assert len(calls) == 7 and all(
-        call[0] == "pull" and "@sha256:" in call[1] for call in calls
-    )
+    assert set(calls) == {("pull", image) for image in manifest["images"].values()}
+    assert len(calls) == 4
     assert destination.read_text() == release.deployment_env(manifest)
+    assert engines.read_text() == engine_values
     original = destination.read_bytes()
     calls.clear()
     with pytest.raises(ValueError, match="existing env"):

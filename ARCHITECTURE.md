@@ -128,9 +128,11 @@ shared GPU lease also use external volumes. Compose teardown preserves these
 volumes. Images reside in Docker's image store. Generated videos and receipts
 are separate, ignored artifacts.
 
-The same Compose entry points accept digest-pinned image overrides from the
-[release manifest](docs/guides/container-releases.md). Registry configuration and
-credentials remain private. Runner [metrics](docs/guides/monitoring.md) use its
+The same Compose entry points accept CPU image overrides from the
+[release manifest](docs/guides/container-releases.md). CPU publication/pulling
+never stages GPU engines. Operators prepare engine images and weights separately;
+`.engine-images.env` retains their immutable engine references. Registry
+configuration and credentials remain private. Runner [metrics](docs/guides/monitoring.md) use its
 existing authenticated admin listener; no public metrics route or monitoring
 deployment is added.
 

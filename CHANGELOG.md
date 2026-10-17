@@ -6,12 +6,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- Registry-independent container release planning/publication and digest-only
-  deployment manifests for distinct runner/controller/node/model-tools/LightX2V
-  images; manual CI workflow and image overrides in existing Compose entry points.
-- Normal CPU publication reuses verified unchanged engine/node digests; changed
-  engine inputs require an explicit engine release. Routine CI uses hosted workers
-  without GPU image pulls or a self-hosted build-worker service.
+- Registry-independent CPU image publication and digest-only deployment manifests
+  for runner, controller, model-tools and pinned node; manual hosted CI and image
+  overrides in existing Compose entry points. Optional reuse applies only to an
+  unchanged node. Operators independently prepare GPU engines and persistent
+  model volumes; CPU releases require no engine baseline or GPU image publication.
 - Private bearer-authenticated Prometheus metrics for generation/delivery outcomes,
   latency, admission refusals, switching, state and owned-engine recovery.
 - Configurable 120-second graceful model-switch drain and explicit boolean force

@@ -92,12 +92,12 @@ project ports and paths.
 ## Container publication
 
 The explicit [release workflow](../../.github/workflows/release.yml) runs fast
-checks, Compose resolution and engine-baseline compatibility on a GitHub-hosted
-CPU worker, then checks CPU image entrypoints and publishes digest references.
-It reuses matching engine/node digests without pulling GPU layers. Initial or
-changed-engine publication is a separate explicit operator action. It is not
-part of routine CI or a hardware gate. The [release guide](../guides/container-releases.md)
-defines registry credentials, build storage, manifests and pull-only deployment.
+checks and Compose resolution on a GitHub-hosted CPU worker, checks CPU image
+entrypoints and publishes four CPU roles. Optional reuse applies only to the
+same-source node from a prior CPU release. No GPU engine is built, pulled or
+pushed, and no engine baseline is needed. Operators stage their own engines and
+weights separately. The [release guide](../guides/container-releases.md) defines
+registry credentials, manifests, CPU-only pulls and combined deployment settings.
 Publication starts no inference, signer or paid request. Before a production
 release, run the relevant CPU integration and recorded hardware/payment acceptance
 checks for changed behavior; a successful image build is insufficient evidence.

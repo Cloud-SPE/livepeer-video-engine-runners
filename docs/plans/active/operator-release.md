@@ -9,15 +9,17 @@ external data. The broader provider-platform rewrite stays deferred.
 
 - Registry hostname/namespace/authentication are private operator settings. Reuse
   the existing Docker login locally; use separately scoped GitHub secrets in CI.
-- Distinct CPU runner/controller/node/model-tools images plus a separate
-  LightX2V engine image. Record pinned upstream SGLang/vLLM images and model inputs.
-  Never bake weights into CPU images or merge node/runner roles.
-- Source/version tags plus digest-only deployment manifests, with no `latest`.
-  Reuse the same prod/dev Compose entry points; retain local build defaults.
-- Normal CPU CI runs on a GitHub-hosted worker and reuses the complete matching
-  engine baseline; unchanged node source also reuses its prior image. An initial
-  or changed-engine bundle is explicitly published from a suitable build machine.
-  No self-hosted CI worker service is needed for routine CPU releases.
+- Publish distinct CPU runner/controller/node/model-tools images. Operators pull
+  upstream SGLang/vLLM-Omni and locally prepare the existing LightX2V image, then
+  download model weights into external volumes. CPU publication/pulling performs
+  no GPU engine action and requires no engine baseline.
+- Source/version tags plus digest-only CPU deployment manifests, with no `latest`.
+  Reuse existing prod/dev Compose entry points and preserve the operator's separate
+  `.engine-images.env`. The earlier unreleased combined-bundle format is rejected.
+- Normal CPU CI uses a GitHub-hosted worker. Node reuse from a complete prior CPU
+  manifest is optional and requires matching source, Dockerfile and platform.
+  A first CPU release builds four CPU roles without any previous manifest. No
+  self-hosted worker service or GPU engine publication is needed.
 - Metrics use the existing authenticated admin listener, not public generation.
   Do not deploy another monitoring stack or change host exporters.
 - Graceful switching waits up to 120 seconds for active work. Expiry refuses the
@@ -43,15 +45,15 @@ external data. The broader provider-platform rewrite stays deferred.
 - [x] Release roles/inputs are pinned and credentials/mutable refs are refused.
 - [x] Publishing records registry digests and exports reusable Compose inputs.
 - [x] Incomplete manifests cannot be pulled/deployed.
-- [x] CPU publication skips reused engine/node builds, pulls and pushes; changed
-      engine inputs refuse reuse and changed node source triggers a CPU rebuild.
+- [x] CPU-only publication and pulls require no engine baseline and preserve operator engine settings.
+- [x] Optional node reuse retains provenance; incompatible/legacy GPU bundles are refused before Docker actions.
 - [x] Full CPU/format/package/Compose checks and real managed/bundled fixture verification.
-- [ ] Final-source managed CPU rerun after the heavy engine build completes.
+- [x] Clean-source managed CPU rerun passed after heavy extraction ended; the earlier failed receipt is retained.
 - [ ] Local source checkpoint, registry publication and digest-based pull/CLI verification.
 
 The [release guide](../../guides/container-releases.md),
 [monitoring guide](../../guides/monitoring.md) and canonical
 [switching procedure](../../guides/container-deployment.md#generate-inspect-and-switch)
 own operating instructions. The [dated report](../../validation/reports/operator-release-2026-10-17.md)
-records 246 CPU tests, 37 Compose configurations, fresh wheel installation,
+records 249 CPU tests, 37 Compose configurations, fresh wheel installation,
 16 decoded fixture clips, cleanup and the remaining publication boundary.

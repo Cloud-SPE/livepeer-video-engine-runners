@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan, publish or pull a pinned operator release without GPU or payer access."""
+"""Plan, publish or pull CPU images; GPU engines remain operator-prepared."""
 
 import hashlib
 import argparse
@@ -8,6 +8,22 @@ import os
 import re
 import subprocess
 from pathlib import Path
+
+ROLE_ENV = {
+    "runner": "RUNNER_IMAGE",
+    "controller": "CONTROLLER_IMAGE",
+    "node": "LIVEPEER_NODE_IMAGE",
+    "model-tools": "MODEL_TOOLS_IMAGE",
+}
+
+
+def require_cpu_release(value):
+    if (
+        value.get("schema_version") != 2
+        or value.get("scope") != "cpu"
+        or set(value.get("components", {})) != set(ROLE_ENV)
+    ):
+        raise ValueError("a CPU-only release manifest with four CPU roles is required")
 
 
 def plan(root, registry, namespace, tag, revision):
@@ -33,39 +49,31 @@ def plan(root, registry, namespace, tag, revision):
     ):
         raise ValueError("node roles must use the same pinned source")
     components = {}
-    for name in ("runner", "controller", "model-tools", "node", "lightx2v-engine"):
+    for name in ("runner", "controller", "model-tools", "node"):
         components[name] = {
             "tag": f"{registry}/{namespace}/{'livepeer-node' if name == 'node' else 'livepeer-video-' + name}:{tag}",
             "context": node_sources[0] if name == "node" else ".",
             "dockerfile": (
                 "docker/Dockerfile"
                 if name == "node"
-                else (
-                    "deploy/docker/lightx2v-engine.Dockerfile"
-                    if name == "lightx2v-engine"
-                    else "deploy/docker/cpu.Dockerfile"
-                )
+                else "deploy/docker/cpu.Dockerfile"
             ),
         }
         if name in {"runner", "controller", "model-tools"}:
             components[name]["target"] = name
     inputs = [
+        "pyproject.toml",
         "uv.lock",
         "configs/model-assets.json",
-        "configs/engine-images.json",
         "compose.prod.yml",
         "compose.dev.yml",
         "deploy/compose/signer.yml",
+        "deploy/compose/assets.yml",
     ]
     inputs += sorted(
         str(file.relative_to(root))
         for pattern in ("models/*.json", "configs/controller/*.json")
         for file in root.glob(pattern)
-    )
-    inputs += sorted(
-        str(file.relative_to(root))
-        for file in (root / "configs/lightx2v").rglob("*")
-        if file.is_file()
     )
     inputs += sorted(
         {
@@ -75,12 +83,12 @@ def plan(root, registry, namespace, tag, revision):
         }
     )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "scope": "cpu",
         "source_revision": revision,
         "tag": tag,
         "platform": "linux/amd64",
         "components": components,
-        "engine_inputs": json.loads((root / "configs/engine-images.json").read_text()),
         "input_sha256": {
             file: hashlib.sha256((root / file).read_bytes()).hexdigest()
             for file in inputs
@@ -89,45 +97,22 @@ def plan(root, registry, namespace, tag, revision):
 
 
 def reuse_images(planned, previous):
-    if previous.get("schema_version") != 1 or previous.get("status") != "published":
-        raise ValueError("a complete published engine release is required for reuse")
+    require_cpu_release(planned)
+    if previous.get("status") != "published":
+        raise ValueError("a complete published CPU release is required for node reuse")
     deployment_env(previous)
-
-    def engine_files(value):
-        return {
-            name: digest
-            for name, digest in value["input_sha256"].items()
-            if name == "deploy/docker/lightx2v-engine.Dockerfile"
-            or name.startswith("configs/lightx2v/")
-        }
-
-    if any(
-        previous["engine_inputs"][key] != planned["engine_inputs"][key]
-        for key in ("lightx2v_base", "lightx2v_commit")
-    ) or engine_files(previous) != engine_files(planned):
-        raise ValueError(
-            "engine release inputs changed; publish an explicit engine release before CPU publication"
-        )
-    for name in ("node", "lightx2v-engine"):
-        component = planned["components"][name]
-        if (
-            name == "node"
-            and component["context"] != previous["components"][name]["context"]
-        ):
-            continue
-        component["reuse"] = previous["images"][name]
-        component["tag"] = previous["components"][name]["tag"]
-        component["image_source_revision"] = previous["components"][name].get(
-            "image_source_revision",
-            (
-                component["context"].rsplit("#", 1)[1]
-                if name == "node"
-                else previous["source_revision"]
-            ),
-        )
+    component, old = planned["components"]["node"], previous["components"]["node"]
+    if previous["platform"] != planned["platform"] or any(
+        component[key] != old[key] for key in ("context", "dockerfile")
+    ):
+        return
+    component["reuse"] = previous["images"]["node"]
+    component["tag"] = old["tag"]
+    component["image_source_revision"] = component["context"].rsplit("#", 1)[1]
 
 
 def publish(root, planned, output, docker):
+    require_cpu_release(planned)
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     manifest = {**planned, "status": "building", "images": {}}
     save(output / "manifest.json", manifest)
@@ -166,25 +151,16 @@ def publish(root, planned, output, docker):
                 "--label",
                 "org.opencontainers.image.version=" + planned["tag"],
             ]
-            if name == "lightx2v-engine":
-                args += [
-                    "--build-arg",
-                    "LIGHTX2V_IMAGE=" + planned["engine_inputs"]["lightx2v_base"],
-                    "--build-arg",
-                    "LIGHTX2V_COMMIT=" + planned["engine_inputs"]["lightx2v_commit"],
-                ]
             docker(*args, component["context"])
-            if name != "lightx2v-engine":
-                # CLI/import check only. Never launch an orchestrator, signer,
-                # GPU engine or model download as part of publishing.
-                docker(
-                    "run",
-                    "--rm",
-                    "--runtime=runc",
-                    "--network=none",
-                    component["tag"],
-                    "--help",
-                )
+            # CLI/import check only; no services or model downloads.
+            docker(
+                "run",
+                "--rm",
+                "--runtime=runc",
+                "--network=none",
+                component["tag"],
+                "--help",
+            )
             docker("push", component["tag"])
             repository = component["tag"].rsplit(":", 1)[0]
             digests = json.loads(
@@ -226,20 +202,10 @@ def save(path, value):
 
 
 def deployment_env(manifest):
-    keys = {
-        "runner": "RUNNER_IMAGE",
-        "controller": "CONTROLLER_IMAGE",
-        "node": "LIVEPEER_NODE_IMAGE",
-        "model-tools": "MODEL_TOOLS_IMAGE",
-        "lightx2v-engine": "LIGHTX2V_ENGINE_IMAGE",
-    }
-    if set(manifest.get("images", {})) != set(keys):
+    require_cpu_release(manifest)
+    if set(manifest.get("images", {})) != set(ROLE_ENV):
         raise ValueError("release requires every role's registry digest")
-    values = {key: manifest["images"][name] for name, key in keys.items()}
-    values.update(
-        SGLANG_ENGINE_IMAGE=manifest["engine_inputs"]["sglang"],
-        VLLM_OMNI_ENGINE_IMAGE=manifest["engine_inputs"]["vllm-omni"],
-    )
+    values = {key: manifest["images"][name] for name, key in ROLE_ENV.items()}
     if any(
         not isinstance(value, str)
         or not re.fullmatch(
@@ -252,19 +218,15 @@ def deployment_env(manifest):
             "release images must be credential-free registry digest references"
         )
     return (
-        "# Immutable release references; no credentials or model weights.\n"
+        "# CPU image references; use the operator's separate .engine-images.env for engines.\n"
         + "".join(f"{key}={value}\n" for key, value in sorted(values.items()))
     )
 
 
 def pull(root, manifest, env_file, docker):
-    if manifest.get("schema_version") != 1 or manifest.get("status") != "published":
+    if manifest.get("status") != "published":
         raise ValueError("a complete published release manifest is required")
     env = deployment_env(manifest)
-    if manifest["engine_inputs"] != json.loads(
-        (root / "configs/engine-images.json").read_text()
-    ):
-        raise ValueError("checkout engine pins differ from release")
     # Use the checkout's known input paths, never paths supplied by a manifest.
     expected = plan(
         root, "registry.example.com", "release", "check", manifest["source_revision"]
@@ -273,11 +235,7 @@ def pull(root, manifest, env_file, docker):
         raise ValueError("checkout launch/build inputs differ from release")
     if env_file.exists():
         raise ValueError("refusing to replace an existing env file")
-    for image in [
-        *manifest["images"].values(),
-        manifest["engine_inputs"]["sglang"],
-        manifest["engine_inputs"]["vllm-omni"],
-    ]:
+    for image in manifest["images"].values():
         docker("pull", image)
     with env_file.open("x") as stream:
         stream.write(env)
@@ -297,7 +255,7 @@ def main():
         sub.add_argument(
             "--reuse-manifest",
             type=Path,
-            help="Reuse an unchanged engine and same-source node from a published baseline",
+            help="Optionally reuse the same-source node from a published CPU release",
         )
     consumer = commands.add_parser("pull")
     consumer.add_argument("--manifest", type=Path, required=True)

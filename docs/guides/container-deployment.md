@@ -45,7 +45,8 @@ use isolated run-specific image tags; those are not deployment defaults.
 
 For versioned registry images, use the [release workflow](container-releases.md).
 The same Compose files accept digest overrides for runner, controller, node and
-model preparation images; local build defaults remain available.
+model preparation images; local build defaults remain available. CPU releases
+leave engine preparation and `.engine-images.env` under operator control.
 
 Advanced bundled mode uses `livepeer-video-engine-runners-<engine>:local` and
 deliberately includes the runner and engine together. It is a separate recipe

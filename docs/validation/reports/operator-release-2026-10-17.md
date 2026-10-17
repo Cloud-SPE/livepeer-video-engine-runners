@@ -34,7 +34,7 @@ controller operations still use managed shutdown's bounded reconciliation.
 
 | Check                                                          | Result                                                                                                                                 |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Fast repository/configuration/import/Black/Ruff/CPU suite      | 246 tests passed                                                                                                                       |
+| Fast repository/configuration/import/Black/Ruff/CPU suite      | 249 tests passed                                                                                                                       |
 | Formatting, whitespace, YAML and merge markers                 | Passed on changed files                                                                                                                |
 | Compose configuration matrix                                   | 37 configurations resolved                                                                                                             |
 | Fresh wheel installation and four entrypoints outside checkout | Passed                                                                                                                                 |
@@ -50,38 +50,50 @@ resources. Automatic cleanup refused the resulting unrecorded stopped fixture.
 Manual review verified its unique test image, full trusted launch policy, name
 and non-running state before removal; cleanup then verified complete. The failed
 receipt is retained. No ownership checks or timeouts were weakened. This exposes
-[HARNESS-03](../../plans/tech-debt.md); an idle-host managed rerun remains pending.
+[HARNESS-03](../../plans/tech-debt.md). After extraction ended, a fresh clean-source
+managed run at `b4357a2` passed with nine decoded clips and complete cleanup.
 The updated-source bundled rerun passed with seven decoded clips and complete
 verified cleanup. No GPU or unrelated workload was touched.
 
-CPU run receipts retain the source base plus dirty-worktree indication and
-individual workload/cleanup evidence privately. Their images used the current
-implementation before the local source checkpoint. No new GPU or paid request
+CPU run receipts retain exact source revisions, dirty-worktree indications and
+individual workload/cleanup evidence privately. The latest managed receipt is
+from a clean committed checkout; the bundled rerun used `f46f3c3`, whose runtime
+source matches `b4357a2`. No new GPU or paid request
 was submitted. Existing hardware/payment evidence remains scoped to its original
 image/source/configuration.
 
-## Container publication status
+## CPU release boundary and publication status
 
-The publisher is implemented with pinned inputs, CPU entrypoint checks,
-registry digest receipts, a complete-release env and a guarded pull command.
-It preserves completed-image evidence if later publication fails. Unit tests
-verify role separation, invalid/credential-bearing inputs, digest-only output,
-incomplete-manifest refusal and preservation of existing deployment settings.
+Operators prepare GPU engines and weights on their own hosts. Application
+publication is limited to four CPU roles: runner, controller, model-tools and
+pinned node. Its version-2 CPU manifest/env never supplies engine references.
+CPU pulls stage only those four images, preserving `.engine-images.env` and
+external data. Optional prior-manifest reuse applies only to a matching node;
+no previous manifest or engine baseline is required for an initial CPU release.
 
-The initial clean source checkpoint is `0c33f45`. Its four CPU images have
-published successfully and passed entrypoint checks; the one-time LightX2V
-baseline is still building. No complete release bundle is claimed yet.
+The initial `0c33f45` attempt published four CPU images, which passed actual
+registry-digest pulls, image/source-label matching and offline entrypoint checks.
+That attempt also built a roughly 36 GiB LightX2V image and began an engine
+upload. The upload was stopped after the operator clarified the release boundary.
+The old combined attempt is retained as failed evidence and produced no complete
+deployment env. Its format and engine publication path are removed from the
+current publisher. The operator's existing local LightX2V preparation recipe is
+unchanged. No registry or daemon pruning was performed.
 
-The subsequent CPU publication path has 22 release unit cases and 246 full CPU
-tests passing. Tests observed missing reuse, changed-input refusal, node rebuild
-selection, skip-build behavior and recursive baked-configuration hashing fail
-before implementation. It reuses the engine only when all recorded engine build
-inputs match, and reuses node only at the same upstream source. The old manifest
-is preserved, with original image tags/source provenance retained in the new one.
-Normal CI uses a hosted CPU worker and does not pull/build/push the GPU engine.
+The corrected path has 25 release unit cases passing. An acceptance regression
+first reproduced the unwanted LightX2V build in a normal application release.
+Tests now verify cold CPU publication, exact CPU-only env/pulls, missing engine
+build files, preservation of operator settings, node provenance and refusal of
+combined GPU bundles before any Docker action. Deliberately removing the CPU
+publication guard and adding an engine pull each made its protective test fail;
+the production source was restored. Earlier GPU-baseline assertions were replaced
+because that release requirement was explicitly retired, rather than weakened
+as a workaround for a failure.
+
+The corrected CPU-only path passes all 249 CPU tests and 37 Compose
+configurations. Corrected registry publication will be recorded after its
+digest-pull and entrypoint verification. Operating instructions remain generic
+in the [release guide](../../guides/container-releases.md). The manually triggered
+hosted CPU workflow is prepared; remote activation and registry settings/secrets
+are separate actions. Optional node reuse does not require an engine baseline.
 No self-hosted build-worker service was installed.
-
-The manually triggered GitHub workflow is prepared; registry settings/secrets,
-the complete baseline manifest variable and remote activation are not implied by
-a successful local build. Operating instructions remain generic in the
-[release guide](../../guides/container-releases.md).
