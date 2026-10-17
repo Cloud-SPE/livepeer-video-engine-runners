@@ -175,6 +175,10 @@ match the plan and input hashes. Raw upstream VBench result JSON can also be
 imported, with its provenance explicitly marked operator-asserted. Missing
 dimensions remain missing. A partial evaluation is not a full quality pass.
 
+Score import preserves upstream numeric units. In the pinned evaluator,
+per-video imaging quality uses raw MUSIQ scores while its aggregate divides by 100. Normalize that dimension explicitly when deriving group means; retain the
+original values and do not combine unlike dimensions into an overall score.
+
 These six dimensions use VBench `custom_input`, following its
 [supported custom-video protocol](https://github.com/Vchitect/VBench). Scores on
 this project's prompts are not leaderboard scores. Some upstream evaluator
@@ -227,10 +231,92 @@ reported and excluded from the usable fraction. Small pilot counts are
 descriptive, not statistically established improvements. Confirm promising
 candidates with more prompts/seeds and independent review before promotion.
 
+For resolution comparisons, also inspect each clip in full screen at the target
+display size; a small preview can hide differences in fine detail.
+
+To reuse only matching baseline clips from a larger completed run, add repeatable
+`--experiment ID`, `--prompt ID` and `--seed NUMBER` options to `report`. Values
+within each option are alternatives; the experiment, prompt and seed selections
+apply together. Omitting `--seed` includes all seeds for the selected scenes.
+For example:
+
+```sh
+uv run --locked python -m video_runners.tools.quality report \
+  --run-dir artifacts/video-quality/baseline-screen \
+  --run-dir artifacts/video-quality/candidate-screen \
+  --experiment baseline --experiment candidate \
+  --prompt hands-pour --prompt objects-relations --prompt rain-night --seed 42 \
+  --output artifacts/video-quality/targeted-review
+```
+
+Use the experiment IDs recorded in those plans. Selection verifies the original
+plans/receipts and selected video hashes; it does not rewrite their evidence or
+submit generation. Unknown IDs and selections with no completed clips fail.
+The private key records the selection. Scenes with only one selected completed
+clip remain single-clip usability reviews, so verify the expected pair count
+before requesting A/B feedback.
+
 Keep native-profile comparisons separate from controlled parameter comparisons.
 For a controlled test, hold prompt, seed, duration and encoding fixed except the
 intended variable. Record latency, sampled peak VRAM/RAM and failures beside
 quality; the existing provider-host telemetry helper can supply resource data.
+
+## Longer video clips
+
+Duration is approximately decoded frame count divided by output FPS. Current
+profiles deliberately use short workloads: 49 frames at 24 FPS is about two
+seconds, 61 at 16 FPS about 3.8 seconds, and 81 at 16 FPS about five seconds.
+The runner's existing `num_frames` field reaches all three engine adapters; it
+has no fixed five-second duration ceiling. Checkpoint behavior and GPU memory
+still determine which requests are useful and feasible.
+
+For these Wan checkpoints, use frame counts aligned to `4n+1`, following the
+[upstream option](https://github.com/Wan-Video/Wan2.2/blob/main/generate.py).
+Approximate targets, rounded to that frame grid:
+
+| Target duration | Frames at 16 FPS | Frames at 24 FPS |
+| --------------- | ---------------- | ---------------- |
+| 10 seconds      | 161              | 241              |
+| 15 seconds      | 241              | 361              |
+| 20 seconds      | 321              | 481              |
+| 30 seconds      | 481              | 721              |
+
+These are arithmetic targets, not validated workload promises. Lowering output
+FPS stretches the same generated frames into slow motion. Frame interpolation
+can smooth existing motion; additional action requires generating new content.
+Keep the model's trained sampling recipe while varying duration.
+
+There are three distinct workflows:
+
+1. Generate more frames in one job. This already uses the current request API,
+   but longer sequences increase compute/activation memory and need fresh checks
+   for motion, identity drift and task completion. Start at 480p: the recorded
+   five-second LightWan 720p workload already sampled roughly 31 GiB VRAM.
+   [LightX2V memory options](https://lightx2v-en.readthedocs.io/en/latest/deploy_guides/for_low_resource.html)
+   include CPU offload and VAE tiling; each changed recipe needs validation.
+2. Extend a clip using prior frames as conditioning. This requires an appropriate
+   I2V/V2V or progressive-generation checkpoint and media-input handling beyond
+   the runner's current text-only job contract. Repeated persistent-session jobs
+   do not automatically inherit prior video context. Boundary artifacts and
+   accumulated drift need review.
+3. Generate several shots and assemble an edited sequence. Existing jobs can
+   produce the source clips; an explicit assembly step can cut or join them into
+   a longer file. Independently generated shots do not establish continuous
+   subject/scene identity across cuts.
+
+[FramePack](https://github.com/lllyasviel/FramePack) demonstrates progressive
+long-video generation, including a one-minute example. It is a separate model
+and workflow, not a validated profile in this repository. LightX2V also documents
+[autoregressive distillation](https://lightx2v-en.readthedocs.io/en/latest/method_tutorials/autoregressive_distill.html),
+but describes its current quality as experimental. Runtime support alone does
+not validate a checkpoint's quality, 5090 memory fit or this runner's integration.
+
+Keep duration trials separate from resolution screening. Record the actual
+frames/FPS, recipe, memory and complete-clip usability. The [duration ladder](../validation/reports/video-quality-screening-2026-10-16.md)
+delivered 10- and 15-second 480p clips; 20 seconds failed in sparse attention and
+30 seconds was not attempted natively. Successful technical delivery still needs
+whole-clip human review. Use new run directories
+and preserve failures; never automatically regenerate an uncertain job.
 
 ## Cleanup and verification
 

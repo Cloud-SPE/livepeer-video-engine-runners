@@ -90,6 +90,9 @@ Source: [tools/quality.py](../../src/video_runners/tools/quality.py).
 | `--evaluator-ref` | —       | `None`                                           | Required             |
 | `--run-dir`       | —       | `None`                                           | Required; `append`   |
 | `--output`        | —       | `None`                                           | Required             |
+| `--experiment`    | —       | `[]`                                             | `append`             |
+| `--prompt`        | —       | `[]`                                             | `append`             |
+| `--seed`          | —       | `[]`                                             | `append`             |
 | `--key`           | —       | `None`                                           | Required             |
 | `--ratings`       | —       | `None`                                           | Required             |
 | `--output`        | —       | `None`                                           | Required             |

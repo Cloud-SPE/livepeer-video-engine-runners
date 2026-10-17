@@ -316,15 +316,38 @@ def read_run(directory):
     return benchmark, receipt
 
 
-def report(runs, output):
+def report(runs, output, *, experiments=(), prompts=(), seeds=()):
+    records = [(directory, *read_run(directory)) for directory in runs]
+    selections = {"experiment": set(experiments), "prompt_id": set(prompts)}
+    requested_seeds = set(seeds)
+    filtered = any(selections.values()) or bool(requested_seeds)
+    for field, requested in selections.items():
+        known = {job[field] for _, benchmark, _ in records for job in benchmark["jobs"]}
+        if requested - known:
+            raise ValueError(
+                f"unknown report {field}: {', '.join(sorted(requested - known))}"
+            )
+
+    def selected(job):
+        return all(
+            not values or job[field] in values for field, values in selections.items()
+        ) and (not requested_seeds or job["request"]["seed"] in requested_seeds)
+
+    if filtered and not any(
+        selected(job) and receipt["jobs"].get(job["id"], {}).get("state") == "completed"
+        for _, benchmark, receipt in records
+        for job in benchmark["jobs"]
+    ):
+        raise ValueError("no completed videos match report selection")
     output.mkdir(mode=0o700, parents=True)
     videos = output / "videos"
     videos.mkdir(mode=0o700)
     salt = secrets.token_hex(16)
     groups, copied = {}, set()
-    for directory in runs:
-        benchmark, receipt = read_run(directory)
+    for directory, benchmark, receipt in records:
         for job in benchmark["jobs"]:
+            if not selected(job):
+                continue
             entry = receipt["jobs"].get(job["id"], {})
             if entry.get("state") != "completed":
                 continue
@@ -405,10 +428,15 @@ function exportRatings() { const blob=new Blob([JSON.stringify({schema_version:1
     )
     (output / "index.html").write_text(html)
     (output / "index.html").chmod(0o600)
-    atomic_json(
-        output.with_name(output.name + ".key.json"),
-        {"schema_version": 1, "report_id": report_id, "pairs": pairs},
-    )
+    key = {"schema_version": 1, "report_id": report_id, "pairs": pairs}
+    if filtered:
+        key["selection"] = {
+            "experiments": sorted(experiments),
+            "prompts": sorted(prompts),
+        }
+        if requested_seeds:
+            key["selection"]["seeds"] = sorted(requested_seeds)
+    atomic_json(output.with_name(output.name + ".key.json"), key)
     return {
         "report_id": report_id,
         "pairs": len(pairs),
@@ -637,6 +665,15 @@ def main():
     )
     reviewer.add_argument("--run-dir", type=Path, action="append", required=True)
     reviewer.add_argument("--output", type=Path, required=True)
+    reviewer.add_argument(
+        "--experiment", action="append", default=[], help="Include this experiment ID"
+    )
+    reviewer.add_argument(
+        "--prompt", action="append", default=[], help="Include this prompt ID"
+    )
+    reviewer.add_argument(
+        "--seed", type=int, action="append", default=[], help="Include this seed"
+    )
     summarizer = commands.add_parser(
         "summary", help="Unblind exported ratings and summarize preferences/usability"
     )
@@ -673,7 +710,17 @@ def main():
                 )
             )
         elif args.command == "report":
-            print(json.dumps(report(args.run_dir, args.output)))
+            print(
+                json.dumps(
+                    report(
+                        args.run_dir,
+                        args.output,
+                        experiments=args.experiment,
+                        prompts=args.prompt,
+                        seeds=args.seed,
+                    )
+                )
+            )
         else:
             value = summarize(
                 json.loads(args.key.read_text()), json.loads(args.ratings.read_text())

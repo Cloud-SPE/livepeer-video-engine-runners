@@ -215,6 +215,113 @@ def test_report_blinds_model_identity_and_escapes_prompt_content(tmp_path):
     assert len(list((output / "videos").glob("*.mp4"))) == 2
 
 
+def test_report_selects_a_seed_without_rewriting_source_evidence(tmp_path):
+    benchmark = plan(suite_fixture(tmp_path), "screen")
+
+    async def render(job, path):
+        path.write_bytes(job["id"].encode())
+
+    directory = tmp_path / "run"
+    asyncio.run(
+        generate(
+            benchmark,
+            directory,
+            render,
+            inspect=lambda p: {"sha256": hashlib.sha256(p.read_bytes()).hexdigest()},
+            max_jobs=8,
+        )
+    )
+    original = {p.name: p.read_bytes() for p in directory.iterdir() if p.is_file()}
+    output = tmp_path / "review"
+    result = report([directory], output, prompts=("fox",), seeds=(42,))
+    assert result["pairs"] == 1
+    assert result["videos"] == 2
+    key = json.loads(output.with_suffix(".key.json").read_text())
+    assert key["pairs"][0]["seed"] == 42
+    assert key["selection"]["seeds"] == [42]
+    assert {
+        p.name: p.read_bytes() for p in directory.iterdir() if p.is_file()
+    } == original
+
+
+def test_report_selects_clips_without_rewriting_source_evidence(tmp_path):
+    suite = suite_fixture(tmp_path)
+    data = json.loads(suite.read_text())
+    data["experiments"].append(
+        {"id": "fast", "model": "sample", "parameters": {"steps": 3}}
+    )
+    data["suites"]["screen"]["experiments"].append("fast")
+    suite.write_text(json.dumps(data))
+    benchmark = plan(suite, "screen")
+
+    async def render(job, path):
+        path.write_bytes(job["id"].encode())
+
+    directory = tmp_path / "run"
+    asyncio.run(
+        generate(
+            benchmark,
+            directory,
+            render,
+            inspect=lambda p: {"sha256": hashlib.sha256(p.read_bytes()).hexdigest()},
+            max_jobs=12,
+        )
+    )
+    original = {p.name: p.read_bytes() for p in directory.iterdir() if p.is_file()}
+    output = tmp_path / "review"
+    report([directory], output, experiments=("current", "quality"), prompts=("fox",))
+    key = json.loads(output.with_suffix(".key.json").read_text())
+    assert len(key["pairs"]) == 2
+    assert {pair["seed"] for pair in key["pairs"]} == {42, 123}
+    assert all(pair["prompt"] == "A red fox walks in snow." for pair in key["pairs"])
+    expected = {
+        job["id"]
+        for job in benchmark["jobs"]
+        if job["prompt_id"] == "fox" and job["experiment"] in {"current", "quality"}
+    }
+    assert {
+        side["job_id"] for pair in key["pairs"] for side in pair["sides"]
+    } == expected
+    assert len(list((output / "videos").glob("*.mp4"))) == 4
+    assert key["selection"] == {
+        "experiments": ["current", "quality"],
+        "prompts": ["fox"],
+    }
+    assert {
+        p.name: p.read_bytes() for p in directory.iterdir() if p.is_file()
+    } == original
+
+
+@pytest.mark.parametrize(
+    "selection, message",
+    [
+        ({"experiments": ("typo",)}, "unknown report experiment"),
+        ({"prompts": ("typo",)}, "unknown report prompt_id"),
+        ({"prompts": ("wave",)}, "no completed videos"),
+    ],
+)
+def test_report_refuses_unknown_or_unavailable_selections(tmp_path, selection, message):
+    benchmark = plan(suite_fixture(tmp_path), "screen")
+
+    async def render(job, path):
+        path.write_bytes(b"completed video")
+
+    directory = tmp_path / "run"
+    asyncio.run(
+        generate(
+            benchmark,
+            directory,
+            render,
+            inspect=lambda p: {"sha256": hashlib.sha256(p.read_bytes()).hexdigest()},
+            max_jobs=1,
+        )
+    )
+    output = tmp_path / "review"
+    with pytest.raises(ValueError, match=message):
+        report([directory], output, **selection)
+    assert not output.exists()
+
+
 def test_configured_input_changes_invalidate_the_plan_and_job_identity(tmp_path):
     suite = suite_fixture(tmp_path)
     data = json.loads(suite.read_text())
