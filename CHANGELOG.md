@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Registry-independent container release planning/publication and digest-only
+  deployment manifests for distinct runner/controller/node/model-tools/LightX2V
+  images; manual CI workflow and image overrides in existing Compose entry points.
+- Private bearer-authenticated Prometheus metrics for generation/delivery outcomes,
+  latency, admission refusals, switching, state and owned-engine recovery.
+- Configurable 120-second graceful model-switch drain and explicit boolean force
+  switching with confirmed owned-engine termination before replacement. Failed
+  stop/cleanup keeps admission closed; existing ownership/delivery modes remain.
+
 - Opt-in video-quality harness with versioned prompts/suites, reproducible plans,
   bounded SDK generation, checksum-checked resume, isolated pinned VBench
   evaluation and blind video review with exportable preferences/usability.
@@ -16,6 +25,9 @@ All notable changes to this project are documented here. The format follows [Kee
   with client FPS/negative-prompt options and backend capability checks.
 
 ### Fixed
+
+- Release the GPU reservation when force cancels an admitted persistent task before
+  it begins, and keep initial-loading generation refusals from raising an assertion.
 
 - Permit authenticated deactivation after a controller operation fails, while
   retaining durable ownership checks and rejecting new activation until recovery.

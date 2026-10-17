@@ -44,4 +44,14 @@ export SIGNER_CONFIG_FILE=/tmp/signer.toml SIGNER_KEYSTORE_FILE=/tmp/key.json
 export SIGNER_PASSWORD_FILE=/tmp/key.password SIGNER_RPC_URL_FILE=/tmp/rpc-url
 export SIGNER_STATE_DIR=/tmp/signer-state
 dc -f deploy/compose/signer.yml
+# Published releases resolve through the same entry points, without new overlays.
+export RUNNER_IMAGE=registry.example.com/operator/runner@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+export CONTROLLER_IMAGE=registry.example.com/operator/controller@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+export LIVEPEER_NODE_IMAGE=registry.example.com/operator/node@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+export MODEL_TOOLS_IMAGE=registry.example.com/operator/model-tools@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+export ENGINE=all
+dc -f compose.prod.yml
+dc -f compose.dev.yml
+dc -f deploy/compose/assets.yml
+dc -f deploy/compose/signer.yml
 printf '%s Compose configurations resolved\n' "$count"

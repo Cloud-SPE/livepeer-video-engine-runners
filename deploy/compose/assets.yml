@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: deploy/docker/cpu.Dockerfile
       target: model-tools
-    image: livepeer-video-model-tools:local
+    image: ${MODEL_TOOLS_IMAGE:-livepeer-video-model-tools:local}
     runtime: runc
     network_mode: bridge
     cap_drop: [ALL]

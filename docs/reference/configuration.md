@@ -132,6 +132,7 @@ Source: [runner/app.py](../../src/video_runners/runner/app.py).
 | `--admin-port`           | —                                       | `DEFAULT_ADMIN_PORT`                              | —                    |
 | `--delivery`             | `('single-shot', 'persistent', 'both')` | `'both'`                                          | —                    |
 | `--busy`                 | `('reject', 'wait')`                    | `'reject'`                                        | —                    |
+| `--switch-drain-timeout` | —                                       | `120.0`                                           | —                    |
 | `--session-idle-timeout` | —                                       | `300.0`                                           | —                    |
 
 ### video-controller
@@ -225,6 +226,19 @@ Source: [tools/prepare_weights.py](../../src/video_runners/tools/prepare_weights
 | `--models-dir` | —                                     | `Path('/models')`                | —                    |
 | `--manifest`   | —                                     | `Path('/app/model-assets.json')` | —                    |
 | `--plan`       | —                                     | `False`                          | `store_true`         |
+
+### python3 src/video_runners/tools/release.py
+
+Source: [tools/release.py](../../src/video_runners/tools/release.py).
+
+| Argument      | Choices | Default | Requirement / action |
+| ------------- | ------- | ------- | -------------------- |
+| `--manifest`  | —       | `None`  | Required             |
+| `--env-file`  | —       | `None`  | Required             |
+| `--registry`  | —       | `None`  | Required             |
+| `--namespace` | —       | `None`  | Required             |
+| `--tag`       | —       | `None`  | Required             |
+| `--output`    | —       | `None`  | Required             |
 
 ### python3 src/video_runners/tools/validate_all.py
 

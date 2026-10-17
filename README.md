@@ -429,6 +429,8 @@ uv run video-client --list --discovery https://orchestrator.example.com/discover
 - **Stopping:** SIGTERM deregisters both apps and releases sessions. Bundled engines get 30 seconds before a forced process-group kill; managed mode requests controller deactivation, which can take longer. Use the [managed shutdown sequence](docs/guides/container-deployment.md#stop-restart-and-update) before removing that stack. External engines remain operator-owned.
 - **Abandoned sessions:** the runner releases idle sessions after `--session-idle-timeout`, including offchain sessions. Setting it to `0` disables that runner deadline.
 - **Health:** container health and `GET /healthz` report the engine; the orchestrator also drops runners that miss heartbeats (30 s).
+- **Monitoring:** authenticated `/metrics` on the private admin listener reports jobs, latency, refusals, switches and recovery attempts. See [monitoring](docs/guides/monitoring.md).
+- **Switching:** graceful drain defaults to 120 seconds; expiry leaves the current job running. Explicit `force: true` requires confirmed owned-engine stop before replacement. See [switching](docs/guides/container-deployment.md#generate-inspect-and-switch).
 
 ## Development
 
@@ -489,10 +491,9 @@ Add an entry to the engine's catalog, with defaults the model supports, and run 
 
 - Extend the [implemented engine-container rollout](docs/design/engine-container-rollout.md) with remaining hardware fault, paid-delivery and settlement checks.
 - GPU validation on RTX 4090 and RTX 5090 for each catalog model; pin image tags and record timings here.
-- Publish runner images to GHCR, and a self-hosted GPU workflow for release checks.
+- Versioned image [publication tooling](docs/guides/container-releases.md) is available; extend release acceptance with explicitly invoked hardware checks.
 - Image-to-video (TI2V) inputs, and audio for MiniMax-H3.
 - Upstream fixes: SDK trickle preconnect; a published livepeer-node image.
-- Prometheus metrics (jobs, durations, refusals, engine restarts).
 
 ## Contributing
 

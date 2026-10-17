@@ -9,6 +9,8 @@ observed runs; current guides describe how to deploy the checked-in code.
 | Agent navigation and working constraints          | [AGENTS](../AGENTS.md)                                           |
 | Current components, dependencies and ownership    | [Architecture](../ARCHITECTURE.md)                               |
 | Engine deployment, weights, volumes and recovery  | [Container deployment](guides/container-deployment.md)           |
+| Versioned image publication and digest deployment | [Container releases](guides/container-releases.md)               |
+| Private metrics and scrape configuration          | [Monitoring](guides/monitoring.md)                               |
 | Node orchestrator, signer and Python SDK          | [Node deployment](guides/node-deployment.md)                     |
 | Source layout and command migration               | [Repository layout](guides/repository-layout.md)                 |
 | Catalog sources, generated files and pin updates  | [Configuration](guides/configuration.md)                         |
@@ -23,6 +25,7 @@ observed runs; current guides describe how to deploy the checked-in code.
 | Compatibility and prod/dev Compose cleanup        | [Focused cleanup](plans/active/deployment-cleanup.md)            |
 | Deferred broader provider-platform discussion     | [Full discussion record](plans/deferred/provider-platform-v1.md) |
 | Known gaps and follow-up work                     | [Technical debt](plans/tech-debt.md)                             |
+| Release, metrics and switching implementation     | [Operator release plan](plans/active/operator-release.md)        |
 | Quality benchmark and larger-model work           | [Quality execution plan](plans/active/video-quality.md)          |
 | Generate, evaluate and review quality experiments | [Video quality guide](guides/video-quality.md)                   |
 | Engine-container design and rollout history       | [Engine rollout](design/engine-container-rollout.md)             |

@@ -6,7 +6,7 @@ services:
     build:
       context: ${LIVEPEER_NODE_SOURCE:-https://github.com/livepeer/node.git#08081dbda0f4f7b56e362e3af4b6965bfa1b73a4}
       dockerfile: docker/Dockerfile
-    image: livepeer-node:local
+    image: ${LIVEPEER_NODE_IMAGE:-livepeer-node:local}
     # Two addresses:
     #   service-url         advertised to clients in discovery and channel URLs,
     #                       so it must be reachable from the host (published port).
@@ -45,7 +45,7 @@ services:
       context: .
       dockerfile: deploy/docker/cpu.Dockerfile
       target: runner
-    image: livepeer-video-runner:local
+    image: ${RUNNER_IMAGE:-livepeer-video-runner:local}
     command:
       - --lifecycle=managed
       - --host=0.0.0.0
@@ -56,6 +56,7 @@ services:
       - --runner-url=${RUNNER_URL:-http://${SUBNET_PREFIX:-172.30.88}.10:8989}
       - --admin-host=0.0.0.0
       - --delivery=${DELIVERY:-both}
+      - --switch-drain-timeout=${SWITCH_DRAIN_TIMEOUT_S:-120}
     environment:
       LIVEPEER_BOOTSTRAP_SECRET: ${BOOTSTRAP_SECRET:-devsecret}
       RUNNER_ADMIN_TOKEN: ${RUNNER_ADMIN_TOKEN:-change-me}
@@ -93,7 +94,7 @@ services:
       context: .
       dockerfile: deploy/docker/cpu.Dockerfile
       target: controller
-    image: livepeer-video-controller:local
+    image: ${CONTROLLER_IMAGE:-livepeer-video-controller:local}
     command:
       - --catalog=/config/catalog.json
       - --host=${CONTROL_SUBNET_PREFIX:-172.30.89}.20

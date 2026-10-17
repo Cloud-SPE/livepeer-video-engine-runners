@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import math
 import os
 import signal
 from contextlib import suppress
 from pathlib import Path
 import aiohttp
 from aiohttp import web
+from prometheus_client.aiohttp import make_aiohttp_handler
 from video_runners.catalog import load_catalog
 from video_runners.lifecycle.bundled import EngineSupervisor
 from video_runners.lifecycle.external import ExternalSupervisor
@@ -29,6 +31,29 @@ from video_runners.runner.http import (
 )
 
 log = logging.getLogger("video-runner")
+
+
+def create_admin_app(runner: Runner, token: str) -> web.Application:
+    admin = web.Application(middlewares=[require_admin_token])
+    admin["runner"] = runner
+    admin["admin_token"] = token
+    admin.router.add_get("/admin/status", handle_admin_status)
+    admin.router.add_post("/admin/model", handle_admin_model)
+    admin.router.add_get(
+        "/metrics", make_aiohttp_handler(registry=runner.metrics.registry)
+    )
+    return admin
+
+
+def create_public_app(runner: Runner) -> web.Application:
+    public = web.Application(client_max_size=64 * 1024)
+    public["runner"] = runner
+    public.router.add_get("/healthz", handle_health)
+    public.router.add_get("/models", handle_models)
+    public.router.add_post("/generate", handle_generate)
+    public.router.add_post("/session/start", handle_session_start)
+    public.router.add_post("/session/jobs", handle_session_job)
+    return public
 
 
 def _parse_args() -> argparse.Namespace:
@@ -66,12 +91,20 @@ def _parse_args() -> argparse.Namespace:
         help="reject: refuse requests while the GPU is busy; wait: queue them (billed)",
     )
     parser.add_argument(
+        "--switch-drain-timeout",
+        type=float,
+        default=120.0,
+        help="Seconds to wait for active work before refusing a graceful model switch",
+    )
+    parser.add_argument(
         "--session-idle-timeout",
         type=float,
         default=300.0,
         help="Release a persistent session after this many idle seconds (0 = never)",
     )
     args = parser.parse_args()
+    if not math.isfinite(args.switch_drain_timeout) or args.switch_drain_timeout <= 0:
+        parser.error("--switch-drain-timeout must be positive and finite")
     if not args.secret:
         parser.error("--secret or LIVEPEER_BOOTSTRAP_SECRET is required")
     if args.lifecycle == "external" and not args.engine_url:
@@ -101,19 +134,8 @@ async def _serve(args: argparse.Namespace) -> None:
                 initial_model = args.model or restored or default
             await runner.load(initial_model)
 
-        public = web.Application(client_max_size=64 * 1024)
-        public["runner"] = runner
-        public.router.add_get("/healthz", handle_health)
-        public.router.add_get("/models", handle_models)
-        public.router.add_post("/generate", handle_generate)
-        public.router.add_post("/session/start", handle_session_start)
-        public.router.add_post("/session/jobs", handle_session_job)
-
-        admin = web.Application(middlewares=[require_admin_token])
-        admin["runner"] = runner
-        admin["admin_token"] = os.environ.get("RUNNER_ADMIN_TOKEN", "")
-        admin.router.add_get("/admin/status", handle_admin_status)
-        admin.router.add_post("/admin/model", handle_admin_model)
+        public = create_public_app(runner)
+        admin = create_admin_app(runner, os.environ.get("RUNNER_ADMIN_TOKEN", ""))
 
         sites: list[web.AppRunner] = []
         try:

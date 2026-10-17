@@ -80,6 +80,12 @@ The runner coordinates admission, deregistration and draining. The controller
 owns managed Docker mutations. A healthy engine is not necessarily idle; an
 uncertain generation is never automatically submitted again.
 
+Graceful model switching bounds the wait for active work (120 seconds by default).
+Timeout leaves that job and registration intact. Explicit force requires confirmed
+owned-engine stop and active-task cleanup before replacement; failure blocks
+admission. The [deployment guide](docs/guides/container-deployment.md#generate-inspect-and-switch)
+owns the API, configuration and separate startup/stop bounds.
+
 The shared state-directory lock excludes duplicate controllers using the same
 state. A separate shared GPU lease excludes cooperating managed deployments
 claiming the same GPU UUID. Neither excludes unrelated GPU applications.
@@ -121,6 +127,12 @@ Weights and engine caches use external Docker volumes. Controller state and the
 shared GPU lease also use external volumes. Compose teardown preserves these
 volumes. Images reside in Docker's image store. Generated videos and receipts
 are separate, ignored artifacts.
+
+The same Compose entry points accept digest-pinned image overrides from the
+[release manifest](docs/guides/container-releases.md). Registry configuration and
+credentials remain private. Runner [metrics](docs/guides/monitoring.md) use its
+existing authenticated admin listener; no public metrics route or monitoring
+deployment is added.
 
 The proxy restricts routes and methods, not container ownership or creation
 bodies. A compromised controller retains significant daemon authority. See

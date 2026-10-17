@@ -24,6 +24,7 @@ CLI_SOURCES = {
             "init_deployment",
             "prepare_engines",
             "prepare_weights",
+            "release",
             "validate_all",
             "validate_gpu",
             "validate_recovery",

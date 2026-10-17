@@ -89,6 +89,17 @@ still targets an explicitly selected running CPU test stack; it does not own or
 clean that deployment. The README's manual quick start retains its normal
 project ports and paths.
 
+## Container publication
+
+The explicit [release workflow](../../.github/workflows/release.yml) runs fast
+checks and Compose resolution on a separately configured Docker build worker,
+then checks CPU image entrypoints and publishes digest references. It is not
+part of routine CI or a hardware gate. The [release guide](../guides/container-releases.md)
+defines registry credentials, build storage, manifests and pull-only deployment.
+Publication starts no inference, signer or paid request. Before a production
+release, run the relevant CPU integration and recorded hardware/payment acceptance
+checks for changed behavior; a successful image build is insufficient evidence.
+
 ## Actual GPU validation
 
 Follow the [deployment guide](../guides/container-deployment.md#generate-inspect-and-switch)

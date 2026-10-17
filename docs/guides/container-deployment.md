@@ -43,6 +43,10 @@ The full image reference, including its tag or digest, identifies the image.
 `:local` denotes a local build, not a published registry release. Test harnesses
 use isolated run-specific image tags; those are not deployment defaults.
 
+For versioned registry images, use the [release workflow](container-releases.md).
+The same Compose files accept digest overrides for runner, controller, node and
+model preparation images; local build defaults remain available.
+
 Advanced bundled mode uses `livepeer-video-engine-runners-<engine>:local` and
 deliberately includes the runner and engine together. It is a separate recipe
 from the default managed stacks.
@@ -332,7 +336,30 @@ curl --fail-with-body -X POST \
   -d '{"model":"vllm-omni-wan2.2-ti2v-5b"}'
 ```
 
-Allow the request to stay open while active work drains and the next model loads. A concurrent switch returns 409. Draining has no forced deadline. Only one engine is active; switching causes downtime. Failed activation restores the last good model when possible. Operations use idempotent IDs for lost-response retries, with a bounded 128-operation history.
+Allow the request to stay open while active work drains and the next model loads.
+A concurrent switch returns 409. Graceful drain waits up to 120 seconds, configurable
+with `SWITCH_DRAIN_TIMEOUT_S` in Compose or `--switch-drain-timeout` on the runner
+CLI (positive and finite). On expiry, HTTP 409 leaves the active job and its
+registration intact and restores admission when the engine state permits it.
+New work is refused while draining. The deadline applies to waiting for active
+work; model startup and rollback retain their own profile timeouts.
+
+To interrupt work explicitly, send the same authenticated request with
+`{"model":"lightx2v-wan2.1-t2v-1.3b","force":true}` using a model ID from your
+catalog. `force` must be a JSON boolean; omission is graceful. A forced switch
+cancels the active task, confirms the owned engine has stopped and waits for
+task cleanup before activating a replacement. Owned-engine stop and active-task cleanup share a separate
+120-second bound. Stop errors/timeouts return an error and keep admission closed
+with recovery required. Cancellation acknowledgement alone never proves idle.
+A force request can reload the current model. External mode refuses switching,
+including force. Interrupted generations are never automatically resubmitted.
+
+Only one engine is active; switching causes downtime and closes persistent
+sessions after draining or explicit interruption. Failed activation restores
+the last good model when possible. Controller operations use idempotent IDs for
+lost-response retries, with a bounded 128-operation history. Runner admin calls
+are synchronous; do not assume the controller's operation ID makes a repeated
+force request safe after an ambiguous response. Inspect status before acting.
 
 External mode launches the same configured model as the runner, monitors backend health, and refuses runtime switching. After a failed or interrupted job whose idle state is unknown, it requires an operator restart of the engine and runner. Managed and bundled modes reset their owned engine before readmission. A cancellation acknowledgement does not prove that GPU execution stopped; unknown generation outcomes are never automatically resubmitted.
 
@@ -346,6 +373,10 @@ is idle, normal withdrawal/recovery applies. Engine job deadlines, explicit
 cancellation and uncertain-job reset requirements still apply.
 
 ## Stop, restart, and update
+
+For private operational counters and timing histograms, see the
+[monitoring guide](monitoring.md). Metrics use the existing bearer-authenticated
+admin listener; no metrics route is published through the orchestrator.
 
 ```sh
 docker compose --env-file "$VIDEO_ENV" --env-file .engine-images.env -f compose.prod.yml stop -t 150 runner

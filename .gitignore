@@ -8,8 +8,6 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .engine-images.env
-/artifacts/gpu-validation/
-/artifacts/cpu-validation/
-/artifacts/video-quality/
+/artifacts/
 /.idea/
 /dist/

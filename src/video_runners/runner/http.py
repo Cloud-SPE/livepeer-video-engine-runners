@@ -34,6 +34,8 @@ log = logging.getLogger("video-runner")
 
 async def handle_generate(request: web.Request) -> web.StreamResponse:
     runner: Runner = request.app["runner"]
+    if runner.supervisor.spec is None:
+        raise web.HTTPServiceUnavailable(text="engine is loading")
     try:
         job = runner.job_request(await request.json())
     except (ValueError, json.JSONDecodeError) as exc:
@@ -46,6 +48,8 @@ async def handle_generate(request: web.Request) -> web.StreamResponse:
     resp = web.StreamResponse(
         headers={"Content-Type": "text/event-stream", "Cache-Control": "no-store"}
     )
+    runner.active_job = asyncio.current_task()
+    started, model, outcome = time.monotonic(), runner.spec.id, "failed"
     try:
         # Headers leave now: the orchestrator's 60s response-header timeout is met
         # however long the clip takes, and the stream keeps the call billed.
@@ -61,7 +65,12 @@ async def handle_generate(request: web.Request) -> web.StreamResponse:
             else:
                 await _send_video(resp, item)
         await _sse(resp, "done", {})
+        outcome = "completed"
+    except asyncio.CancelledError:
+        outcome = "cancelled"
+        raise
     except ConnectionResetError:
+        outcome = "cancelled"
         log.info("client went away; engine job cancelled")
     except Exception as exc:
         if not isinstance(exc, EngineError):
@@ -69,6 +78,10 @@ async def handle_generate(request: web.Request) -> web.StreamResponse:
         with suppress(ConnectionResetError):
             await _sse(resp, "error", {"message": str(exc)[:1000]})
     finally:
+        runner.metrics.jobs.labels(model, "single-shot", outcome).inc()
+        runner.metrics.duration.labels(model, "single-shot", outcome).observe(
+            time.monotonic() - started
+        )
         runner.release_gpu()
     return resp
 
@@ -146,12 +159,14 @@ async def handle_session_job(request: web.Request) -> web.Response:
     session.job = asyncio.create_task(
         _render_into_session(runner, session, job_id, job, client)
     )
+    runner.active_job = session.job
     return web.json_response({"job_id": job_id, "model": runner.spec.id}, status=202)
 
 
 async def _render_into_session(
     runner: Runner, session: Session, job_id: str, job: JobRequest, client: EngineClient
 ) -> None:
+    started, model, outcome = time.monotonic(), runner.spec.id, "failed"
     try:
         async for item in client.run(job):
             if isinstance(item, JobStatus):
@@ -182,12 +197,14 @@ async def _render_into_session(
             for part in parts:
                 await session.video.publish(part)
         await session.events.publish_json({"type": "done", "job_id": job_id})
+        outcome = "completed"
     except EngineError as exc:
         with suppress(EngineError):
             await session.events.publish_json(
                 {"type": "error", "job_id": job_id, "message": str(exc)}
             )
     except asyncio.CancelledError:
+        outcome = "cancelled"
         raise
     except Exception:
         log.exception("session %s job %s failed", session.session_id, job_id)
@@ -196,6 +213,10 @@ async def _render_into_session(
                 {"type": "error", "job_id": job_id, "message": "runner error"}
             )
     finally:
+        runner.metrics.jobs.labels(model, "persistent", outcome).inc()
+        runner.metrics.duration.labels(model, "persistent", outcome).observe(
+            time.monotonic() - started
+        )
         session.idle_since = time.monotonic()
         runner.release_gpu()
 
@@ -258,8 +279,11 @@ async def handle_admin_model(request: web.Request) -> web.Response:
     model_id = payload.get("model") if isinstance(payload, dict) else None
     if not isinstance(model_id, str) or model_id not in runner.models:
         raise web.HTTPBadRequest(text=f"model must be one of {sorted(runner.models)}")
+    force = payload.get("force", False)
+    if type(force) is not bool:
+        raise web.HTTPBadRequest(text="force must be a boolean")
     try:
-        await runner.switch(model_id)
+        await runner.switch(model_id, force=force)
     except Busy as exc:
         raise web.HTTPConflict(text=str(exc)) from exc
     except EngineError as exc:

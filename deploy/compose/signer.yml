@@ -6,7 +6,7 @@ services:
     build:
       context: ${LIVEPEER_NODE_SOURCE:-https://github.com/livepeer/node.git#08081dbda0f4f7b56e362e3af4b6965bfa1b73a4}
       dockerfile: docker/Dockerfile
-    image: livepeer-node:local
+    image: ${LIVEPEER_NODE_IMAGE:-livepeer-node:local}
     runtime: runc
     user: "${SIGNER_UID:?Set the container-visible keystore owner UID}:${SIGNER_GID:?Set the container-visible keystore owner GID}"
     restart: unless-stopped

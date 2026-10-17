@@ -7,6 +7,23 @@ export ADMIN_URL="http://127.0.0.1:$RUNNER_ADMIN_PORT"
 export DISCOVERY_URL="http://127.0.0.1:$ORCHESTRATOR_PORT/discovery"
 tests/e2e/e2e.sh
 curl -fsS -X POST -H "Authorization: Bearer $RUNNER_ADMIN_TOKEN" "$ADMIN_URL/admin/model" -d "{\"model\":\"$E2E_MODEL_TWO\"}"
+# Explicit force also works through the real controller/proxy on CPU fixtures.
+curl -fsS -X POST -H "Authorization: Bearer $RUNNER_ADMIN_TOKEN" "$ADMIN_URL/admin/model" -d "{\"model\":\"$E2E_MODEL_TWO\",\"force\":true}"
+uv run --quiet python - <<'PY'
+import os, urllib.error, urllib.request
+url = os.environ['ADMIN_URL'] + '/metrics'
+try:
+    urllib.request.urlopen(url, timeout=5)
+    raise SystemExit('Metrics unexpectedly allowed anonymous access')
+except urllib.error.HTTPError as error:
+    assert error.code == 401, error
+request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['RUNNER_ADMIN_TOKEN']})
+with urllib.request.urlopen(request, timeout=5) as response:
+    text = response.read().decode()
+assert 'video_runner_jobs_total' in text
+assert 'video_runner_switches_total' in text and 'mode="force"' in text
+print('Authenticated metrics and explicit forced switching verified')
+PY
 dc restart controller
 # Generation waits for registrations to recover; retry discovery, not generation.
 wait_for_model() {

@@ -129,7 +129,7 @@ score, and zero does not mean a video is static. All decoded frames were distinc
 These dimensions do not establish correct anatomy, object counts, prompt fidelity
 or usable output. No combined quality score or quality winner is inferred.
 
-## Blind review and cleanup
+## Blind gallery verification
 
 The gallery contains exactly three prompt/seed-matched A/B pairs and six videos,
 each appearing once. Experiment, prompt and seed filters select existing source
@@ -137,7 +137,50 @@ evidence without rewriting it. All six served video hashes matched, while
 private key/operator paths returned 404. Model identities and scores are absent
 from the served HTML, and the blinding key remains outside its root. The operator
 has seen the references before, so randomized labels do not guarantee that the
-clips cannot be recognized. Human preference and usability review are pending.
+clips cannot be recognized. The completed human review is recorded below.
+
+## Human review — 2026-10-17
+
+The exported ratings matched the gallery's report key and contained all three
+paired preferences. Each source plan/receipt was validated again, and all six
+source and gallery MP4 hashes matched the key and completed delivery receipts.
+The original export, unblinded results, summary and verification hashes are
+preserved privately outside the served gallery.
+
+| Scene                | Preferred recipe       | Standard Wan usable | LightWan usable | Operator finding                                                                                       |
+| -------------------- | ---------------------- | ------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
+| Pouring hands        | LightWan reference     | Yes                 | Yes             | The preferred reference still has an extra hand: two hands on the pitcher and another holding the cup. |
+| Object relationships | Standard Wan candidate | Yes                 | Unanswered      | The reference has an extra ball appearing and a warped ball.                                           |
+| Nighttime rain       | Standard Wan candidate | Yes                 | No              | The reference has an extra umbrella appearing from the pedestrian's body.                              |
+
+Standard Wan won two comparisons and LightWan won one, with no ties or neither
+selections. The candidate was marked usable in all three clips. The reference
+has one usable, one unusable and one unanswered usability field; the blank is
+excluded from assessed usability, rather than interpreted as a rejection.
+These counts describe one reviewer's three selected prompt/seed pairs, not a
+general usable-output rate or statistically established improvement.
+
+The pouring vote and extra-hand note are both retained. A preferred clip marked
+usable can still have an anatomy defect; neither its vote nor its usability is
+silently recoded. The broad positive criterion notes do not negate the specific
+extra-hand, ball and umbrella failures. Hands remain unresolved.
+
+This is a promising scene-specific result for the standard recipe on objects
+and rain. The earlier control review found one win each and one tie, so there
+is still no established general winner. In this follow-up, mean aesthetic and
+imaging diagnostics favored the reference while human preference favored the
+candidate in two scenes. Those diagnostics support investigation; they do not
+replace review of the actual failure criteria.
+
+Keep both recipes and current defaults. The proposed next comparison repeats
+objects and rain with another matched seed, using the same recipes and existing
+references. If the benefit repeats, confirm on unused scenes before promotion.
+Pouring needs separate anatomy-focused investigation; do not claim it is fixed.
+No further GPU work follows automatically from this review. The standard recipe's
+approximately 65-fold matched median delivery cost remains a recorded tradeoff,
+with visual quality taking priority in this experiment.
+
+## Owned-resource cleanup
 
 Cleanup verified the four service IDs/configuration fingerprints and network
 identities recorded at startup, plus the recorded evaluator identity. It removed
@@ -157,6 +200,8 @@ utilization; no trial resource remained on the GPU host.
 
 Generation, hardware recovery/shutdown verification, technical delivery checks,
 all six offline diagnostics, gallery verification and owned-resource cleanup are
-complete. Human review of the three pairs is next. No additional seeds, held-out
-jobs or production profile promotion follow automatically from successful
-decoding or metric values. Existing models and defaults remain unchanged.
+complete. Human review is also complete: two standard Wan wins on objects/rain
+and one LightWan win on pouring, with further seeds and held-out confirmation
+pending. No additional jobs or production profile promotion follow automatically
+from these ratings, successful decoding or metric values. Existing models and
+defaults remain unchanged.

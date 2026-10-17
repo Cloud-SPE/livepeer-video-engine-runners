@@ -157,7 +157,8 @@ for exact recipes and evidence. The operator reviewed all three delivered pairs:
 one win each and one tie, with all six clips usable. This control-scene sample
 shows no consistent preference benefit for the standard recipe, whose matched
 median delivery time was about 65 times longer. Hands, object relationships and
-rain remain untested for the candidate; existing defaults are retained.
+rain were untested for the candidate at that checkpoint; existing defaults were
+retained. The subsequent follow-up is recorded below.
 Review-gallery filters select existing clips without rewriting their plans or
 receipts. No new perceptual scores were measured after the stop. The remaining
 owned test deployment and private remote staging have been removed, preserving
@@ -170,20 +171,26 @@ combined-catalog integration passing. A new bounded batch tests seed 42 on hands
 object relationships and rain against existing references. The 82 served model
 files were rehashed without downloading or removing models. See the
 [targeted follow-up](../../validation/reports/video-quality-wan-hard-scenes-2026-10-17.md)
-for provider provenance and the remaining delivery, hardware shutdown, evaluation,
-review and cleanup checks. The gallery tool now supports selecting seeds as well
+for provider provenance, delivery, hardware shutdown, evaluation, review and
+cleanup evidence. The gallery tool now supports selecting seeds as well
 as experiments/prompts without changing source plans or receipts.
 
 All three difficult-scene generations are complete and technically verified.
 The hardware check observed controller replacement before runner shutdown and
 confirmed exit zero, no owned engine and disabled/idle controller state in
 7.38 seconds. Six offline diagnostics completed with matching evaluator
-provenance. The verified gallery contains three pairs/six clips; human review
-is pending. Final owned deployment/staging cleanup passed with protected data
-and unrelated workloads unchanged. The gallery selector is committed in
+provenance. The verified gallery contains three pairs/six clips. Human review
+preferred standard Wan for objects and rain, and LightWan for pouring. All three
+candidate clips were marked usable; the reference has one usable, one unusable
+and one unanswered vote. The preferred pouring reference still has an extra
+hand, so anatomy remains unresolved. Final owned deployment/staging cleanup
+passed with protected data and unrelated workloads unchanged. The gallery selector is committed in
 `3d34d8c`, and the full CPU suite has 202 passing tests. Keep the candidate
-experimental until review, further seeds and held-out confirmation justify a
-supported operator profile. No further generation follows automatically.
+experimental until further seeds and held-out confirmation justify a supported
+operator profile. The proposed next step repeats objects and rain with another
+matched seed and unchanged recipes, then confirms any repeated benefit on unused
+scenes. Hands need separate investigation. No further generation follows
+automatically from these scene-specific preferences.
 Duration exploration and longer-example review are deferred at the operator's
 request. The active objective is higher visual quality on matched short clips.
 Preserve all existing models/defaults and protected external data;

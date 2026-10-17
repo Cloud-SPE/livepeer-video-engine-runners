@@ -49,6 +49,12 @@ fixture, bundled and external recipes. This adds no GPU or paid-operation eviden
 
 ## Recorded hardware and payment evidence
 
+The [operator release checks](reports/operator-release-2026-10-17.md) add 235 CPU
+tests, 37 Compose configurations, fresh wheel installation, and managed/bundled
+Docker checks with 16 decoded fixture clips and verified cleanup. Private metrics
+and bounded/explicit-force switching have CPU evidence. No new GPU or paid work
+was run; registry publication status is recorded separately in that report.
+
 | Area                                             | Status                           | Evidence and scope                                                                                                                                                                                         |
 | ------------------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SGLang FastWan 1.3B                              | Recorded GPU pass                | Both modes at 512×288, then 832×480 and 121-frame clips; [initial report](reports/gpu-validation-2026-10-15.md), [workload report](reports/operations-validation-2026-10-15.md)                            |
@@ -78,7 +84,11 @@ The operator resumed the [three-scene follow-up](reports/video-quality-wan-hard-
 after a regression-tested managed-shutdown correction. The three difficult scenes
 use existing LightWan references. All three new deliveries, six offline metrics,
 the hardware recovery/shutdown case and cleanup passed. The three-pair gallery
-is verified; human review remains pending. The full CPU suite has 202 passing tests.
+is verified. Human review preferred standard Wan for objects and rain, and
+LightWan for pouring, despite an extra hand in that preferred reference. The
+candidate's three clips were marked usable; one reference usability field is
+unanswered. Further seeds and held-out confirmation remain pending, with no
+default change. The full CPU suite has 202 passing tests.
 
 ## Pending validation
 

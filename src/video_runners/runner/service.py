@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -23,8 +24,10 @@ from video_runners.lifecycle.external import ExternalSupervisor
 from video_runners.lifecycle.managed import ManagedSupervisor
 from video_runners.runner.protocol import Busy, app_id
 from video_runners.runner.sessions import Session
+from video_runners.runner.metrics import Metrics
 
 log = logging.getLogger("video-runner")
+FORCE_STOP_TIMEOUT_S = 120.0
 
 
 async def _retry(
@@ -60,6 +63,11 @@ class Runner:
     needs_reset: bool = False
     closing: bool = False
     recovery: asyncio.Task | None = None
+    active_job: asyncio.Task | None = None
+    metrics: Metrics = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.metrics = Metrics(self)
 
     @property
     def spec(self) -> ModelSpec:
@@ -78,7 +86,7 @@ class Runner:
         self.needs_reset = False
         self.available = True
 
-    async def switch(self, model_id: str) -> None:
+    async def switch(self, model_id: str, *, force: bool = False) -> None:
         if model_id not in self.models:
             raise ValueError(f"unknown model {model_id!r}")
         if not self.supervisor.supports_switching:
@@ -87,40 +95,91 @@ class Runner:
             raise Busy("a model switch or recovery is in progress")
         async with self.lifecycle_lock:
             previous = self.spec.id
-            if model_id == previous and self.available:
+            if model_id == previous and self.available and not force:
                 return
+            was_available = self.available
             self.switching = True
             self.available = False
+            acquired = False
+            started, outcome = time.monotonic(), "failed"
+            mode = "force" if force else "graceful"
             try:
-                async with self.gpu:
-                    await self._unregister()
-                    for session in list(self.sessions.values()):
-                        await session.close()
-                    self.sessions.clear()
+                if force:
+                    # A cancellation acknowledgement does not establish idle.
+                    # Confirm owned-engine termination before loading anything.
+                    self.needs_reset = True
                     try:
-                        await self.load(model_id)
-                    except Exception:
-                        log.exception(
-                            "could not load %s; restoring %s", model_id, previous
-                        )
-                        if isinstance(self.supervisor, ManagedSupervisor):
-                            restored = await self.supervisor.preferred_model(timeout=5)
-                            if restored != previous:
-                                raise EngineError(
-                                    "controller has not restored previous model"
-                                )
-                            client = engine_client(self.models[previous], self.http)
-                            await self.supervisor.attach_restored(
-                                self.models[previous], client
+                        async with asyncio.timeout(FORCE_STOP_TIMEOUT_S):
+                            task = self.active_job
+                            if task is not None and not task.done():
+                                task.cancel()
+                            await self.supervisor.stop()
+                            if task is not None:
+                                await asyncio.wait({task})
+                                with suppress(asyncio.CancelledError, Exception):
+                                    task.result()
+                                if self.active_job is task and self.gpu.locked():
+                                    # A persistent task cancelled before its first
+                                    # instruction cannot run its release finally.
+                                    self.release_gpu()
+                            await self.gpu.acquire()
+                            acquired = True
+                    except (TimeoutError, EngineError) as exc:
+                        raise EngineError(
+                            "forced switch could not confirm engine stop; recovery required"
+                        ) from exc
+                if not acquired:
+                    try:
+                        async with asyncio.timeout(
+                            getattr(self.args, "switch_drain_timeout", 120.0)
+                        ):
+                            await self.gpu.acquire()
+                    except TimeoutError as exc:
+                        outcome = "drain_timeout"
+                        raise Busy(
+                            "model switch drain timed out; active job was left running"
+                        ) from exc
+                    acquired = True
+                await self._unregister()
+                for session in list(self.sessions.values()):
+                    await session.close()
+                self.sessions.clear()
+                try:
+                    await self.load(model_id)
+                except Exception:
+                    log.exception("could not load %s; restoring %s", model_id, previous)
+                    if isinstance(self.supervisor, ManagedSupervisor):
+                        restored = await self.supervisor.preferred_model(timeout=5)
+                        if restored != previous:
+                            raise EngineError(
+                                "controller has not restored previous model"
                             )
-                            self.client = client
-                            await self._register(self.models[previous])
-                            self.needs_reset = False
-                            self.available = True
-                        else:
-                            await self.load(previous)
-                        raise
+                        client = engine_client(self.models[previous], self.http)
+                        await self.supervisor.attach_restored(
+                            self.models[previous], client
+                        )
+                        self.client = client
+                        await self._register(self.models[previous])
+                        self.needs_reset = False
+                        self.available = True
+                    else:
+                        await self.load(previous)
+                    raise
+                outcome = "succeeded"
+            except asyncio.CancelledError:
+                outcome = "cancelled"
+                raise
             finally:
+                self.metrics.switches.labels(model_id, mode, outcome).inc()
+                self.metrics.switch_duration.labels(model_id, mode, outcome).observe(
+                    time.monotonic() - started
+                )
+                if acquired:
+                    self.gpu.release()
+                else:
+                    self.available = (
+                        was_available and not self.needs_reset and not self.closing
+                    )
                 self.switching = False
 
     async def monitor_engine(self, interval: float = 2) -> None:
@@ -238,20 +297,29 @@ class Runner:
         that started it has returned, so this is not a context manager.
         """
         if self.switching or self.client is None or not self.available:
+            self.metrics.refusals.labels(
+                self.supervisor.spec.id if self.supervisor.spec else "", "unavailable"
+            ).inc()
             raise Busy("runner is switching models")
         if self.args.busy == "reject" and self.gpu.locked():
+            self.metrics.refusals.labels(self.spec.id, "busy").inc()
             raise Busy("GPU is rendering another job")
         await self.gpu.acquire()
         if self.switching or self.client is None or not self.available:
             self.gpu.release()
+            self.metrics.refusals.labels(self.spec.id, "unavailable").inc()
             raise Busy("runner is switching models")
         return self.client
 
     def release_gpu(self) -> None:
+        self.active_job = None
         if self.client is not None and not self.client.idle_known and not self.closing:
             self.needs_reset = True
             self.available = False
-            self.recovery = asyncio.create_task(self.recover_uncertain_job(self.client))
+            if not self.switching:
+                self.recovery = asyncio.create_task(
+                    self.recover_uncertain_job(self.client)
+                )
         self.gpu.release()
 
     async def recover_uncertain_job(self, client: EngineClient) -> None:
@@ -266,15 +334,18 @@ class Runner:
                 )
                 return
             self.switching = True
+            model, outcome = self.spec.id, "failed"
             try:
                 for session in list(self.sessions.values()):
                     await session.close()
                 self.sessions.clear()
-                await self.load(self.spec.id)
+                await self.load(model)
+                outcome = "succeeded"
             except Exception:
                 log.exception("engine reset after interrupted generation failed")
                 self.available = False
             finally:
+                self.metrics.restarts.labels(model, outcome).inc()
                 self.switching = False
 
     def job_request(self, payload: Any) -> JobRequest:

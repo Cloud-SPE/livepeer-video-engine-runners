@@ -1,0 +1,55 @@
+name: Container release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Explicit release or source tag (never latest)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # GPU image layers exceed typical hosted-runner disk space. This worker
+    # needs Docker and disk capacity, but no GPU or payer credentials.
+    runs-on: [self-hosted, linux, x64, container-release]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Verify source and deployment inputs
+        run: |
+          scripts/check.sh
+          tests/e2e/compose-config.sh
+      - name: Log in to the operator registry
+        env:
+          REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          REGISTRY_USER: ${{ secrets.CONTAINER_REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+        run: |
+          test -n "$REGISTRY" && test -n "$REGISTRY_USER" && test -n "$REGISTRY_PASSWORD"
+          printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USER" --password-stdin
+      - name: Build, check and publish pinned images
+        env:
+          REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          NAMESPACE: ${{ vars.CONTAINER_NAMESPACE }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python3 src/video_runners/tools/release.py publish \
+            --registry "$REGISTRY" --namespace "$NAMESPACE" \
+            --tag "$RELEASE_TAG" --output artifacts/container-release
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: container-release
+          retention-days: 30
+          path: |
+            artifacts/container-release/manifest.json
+            artifacts/container-release/release.env

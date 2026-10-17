@@ -23,6 +23,7 @@ services:
       - --runner-url=${RUNNER_URL:-http://${SUBNET_PREFIX:-172.30.88}.10:8989}
       - --admin-host=0.0.0.0
       - --delivery=${DELIVERY:-both}
+      - --switch-drain-timeout=${SWITCH_DRAIN_TIMEOUT_S:-120}
     environment:
       LIVEPEER_BOOTSTRAP_SECRET: ${BOOTSTRAP_SECRET:-devsecret}
       RUNNER_ADMIN_TOKEN: ${RUNNER_ADMIN_TOKEN:-change-me}
