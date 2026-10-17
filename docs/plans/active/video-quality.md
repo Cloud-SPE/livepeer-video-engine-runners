@@ -72,13 +72,119 @@ integration passed, as did all 33 Compose configurations and fresh wheel
 installation outside the checkout. The evaluator was built and measured all six
 custom-input dimensions on all six saved clips with persistent cached assets.
 
-Operator review remains the next phase: export preferences/usability from the
-private blind gallery, then select candidates for eight-prompt screening and
-held-out confirmation. No default or quality winner is promoted from one
-prompt/seed. The browser UI could not be exercised in this environment; review
-export behavior has automated contracts, and manual playback/export remains an
-operator check. No new paid-operation claim follows from this free SDK pilot.
+The initial and sixteen-pair resolution-screening operator reviews are complete;
+both exported ratings matched their respective report keys. Screening found nine
+ties, two 480p wins, one 720p win and four neither selections. Anatomy and object
+permanence remain the main failures. No default or general quality winner is
+promoted. Target those failures in controlled candidate comparisons, then use
+held-out confirmation of promising candidates. No new paid-operation claim
+follows from this free SDK pilot.
 
 Owned hardware-test containers, private staging and temporary resource aliases
 are removed. External models/caches, wallet/key data and reusable prepared images
 remain; private review clips and evaluator results are retained.
+
+## Resolution screening follow-up
+
+The operator's initial blind review preferred both LightWan resolutions over the
+other tested clips and tied 480p against 720p. The authorized follow-up used the
+existing screening suite: eight prompts × two seeds × two resolutions, followed
+by sixteen matched A/B comparisons. Separate 480p duration jobs delivered 161 and 241 frames (roughly ten and
+fifteen seconds). A 321-frame request failed with CUDA out-of-memory; the ladder
+stopped there without submitting the 481-frame request.
+See the [screening report](../../validation/reports/video-quality-screening-2026-10-16.md)
+for evidence and the [duration discussion](../../guides/video-quality.md#longer-video-clips)
+for longer-output options. Existing models/defaults remain intact.
+
+Earlier longer-output exploration prioritized a continuous shot, followed by an edited
+sequence. The successful continuous probes kept the current recipe at 480p. A separate 30-second montage reuses six generated shots; it is evidence
+for assembly only, not continuous generation or conditioned clip extension.
+
+All 32 screening generations completed with distinct verified videos, and all six
+VBench dimensions were measured offline on those clips and the two successful
+longer clips. Sixteen-pair operator review is complete and its per-scene findings
+are recorded in the screening report; whole-clip longer-output review remains
+pending. The 20-second native
+request failed in sparse attention; it was not retried and no native 30-second
+request was submitted. The edited 30-second montage passed decoding checks.
+The temporary GPU stack and remote staging are removed; the local review gallery
+and private evidence remain available.
+
+## Standard Wan quality comparison
+
+The next authorized experiment compares the current LightWan 480p reference with
+standard non-distilled Wan2.2 T2V A14B through the pinned LightX2V runtime. Start
+with one SDK feasibility request; expand only after verified generation and
+delivery. The target batch contains pouring hands, object relationships,
+nighttime umbrellas, walking fox and portrait turn, with seeds 42/123: ten new
+clips paired with their ten existing 480p references. Prompt text, seed inputs,
+832×480 dimensions, 81 frames and 16 FPS remain matched. Held-out scenes stay
+unused until confirmation.
+
+The candidate uses its standard 40-step CFG recipe with BF16 weights, dense
+SageAttention and supported CPU block offload/module unloading. The reference
+retains its trained four-step NVFP4 sparse-attention recipe. This compares whole
+recipes; it cannot attribute a preference difference to step count, precision or
+attention alone. Negative prompts remain empty in this comparison.
+
+Stage both original expert checkpoints at a pinned revision in external model
+storage, then make separate BF16 checkpoint copies using the same cast as the
+runtime. Retain source/output hashes and conversion provenance. Originals remain
+available; derived files also persist for reuse. Bound preparation and serving
+memory, record host/GPU telemetry, and run inference with offline asset lookup.
+The previous failed vLLM loading attempts do not establish LightX2V feasibility.
+
+Original expert downloads and separate BF16 copies are prepared and verified in
+external model storage. The initial feasibility request was interrupted when a
+transient engine health-probe loss withdrew registration during active GPU work;
+the node canceled its request and the controller terminated the owned engine.
+No video was delivered. The uncertain client receipt and independent termination
+evidence are preserved rather than resumed.
+
+The runner now preserves registrations during active GPU work while refusing new
+admission on failed health. Two regression cases were observed failing before
+their respective fixes; all 198 CPU tests and combined managed CPU integration
+passed afterward. A separate feasibility run using that recorded runtime patch
+with the same model recipe encountered a confirmed host-memory cgroup OOM at
+72 GiB while loading the second expert. Lossless per-block BF16 checkpoint
+partitioning enables the pinned runtime's supported lazy-loading path. That path
+delivered three verified 81-frame clips through the SDK in approximately
+691–704 seconds each. Docker SIGTERM interrupted the fourth request; the operator
+subsequently confirmed that the stop was intentional. No GPU work was restarted.
+Six planned requests remain unsubmitted. See the
+[standard Wan trial](../../validation/reports/video-quality-wan-a14b-2026-10-16.md)
+for exact recipes and evidence. The operator reviewed all three delivered pairs:
+one win each and one tie, with all six clips usable. This control-scene sample
+shows no consistent preference benefit for the standard recipe, whose matched
+median delivery time was about 65 times longer. Hands, object relationships and
+rain remain untested for the candidate; existing defaults are retained.
+Review-gallery filters select existing clips without rewriting their plans or
+receipts. No new perceptual scores were measured after the stop. The remaining
+owned test deployment and private remote staging have been removed, preserving
+external data and local review evidence. Any further GPU comparison needs a new
+explicit operator invocation.
+
+The operator subsequently resumed steps 1–4. The managed-shutdown correction is
+committed at `bd84def`, with 201 CPU tests, 33 Compose configurations and managed
+combined-catalog integration passing. A new bounded batch tests seed 42 on hands,
+object relationships and rain against existing references. The 82 served model
+files were rehashed without downloading or removing models. See the
+[targeted follow-up](../../validation/reports/video-quality-wan-hard-scenes-2026-10-17.md)
+for provider provenance and the remaining delivery, hardware shutdown, evaluation,
+review and cleanup checks. The gallery tool now supports selecting seeds as well
+as experiments/prompts without changing source plans or receipts.
+
+All three difficult-scene generations are complete and technically verified.
+The hardware check observed controller replacement before runner shutdown and
+confirmed exit zero, no owned engine and disabled/idle controller state in
+7.38 seconds. Six offline diagnostics completed with matching evaluator
+provenance. The verified gallery contains three pairs/six clips; human review
+is pending. Final owned deployment/staging cleanup passed with protected data
+and unrelated workloads unchanged. The gallery selector is committed in
+`3d34d8c`, and the full CPU suite has 202 passing tests. Keep the candidate
+experimental until review, further seeds and held-out confirmation justify a
+supported operator profile. No further generation follows automatically.
+Duration exploration and longer-example review are deferred at the operator's
+request. The active objective is higher visual quality on matched short clips.
+Preserve all existing models/defaults and protected external data;
+remove only the temporary owned deployment when the trial finishes.
