@@ -46,6 +46,7 @@ external data. The broader provider-platform rewrite stays deferred.
 - [x] CPU publication skips reused engine/node builds, pulls and pushes; changed
       engine inputs refuse reuse and changed node source triggers a CPU rebuild.
 - [x] Full CPU/format/package/Compose checks and real managed/bundled fixture verification.
+- [ ] Final-source managed CPU rerun after the heavy engine build completes.
 - [ ] Local source checkpoint, registry publication and digest-based pull/CLI verification.
 
 The [release guide](../../guides/container-releases.md),

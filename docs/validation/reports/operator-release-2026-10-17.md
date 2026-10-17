@@ -43,6 +43,17 @@ controller operations still use managed shutdown's bounded reconciliation.
 | Owned integration-resource cleanup                             | Both receipts verified complete                                                                                                        |
 | Public documentation/configuration privacy review              | No operator host/account/address/resource identifiers added                                                                            |
 
+A subsequent managed rerun during heavy local image extraction failed when
+the Docker stop API exceeded its 60-second transport timeout. Admission stayed
+closed. A rollback create completed late, after teardown had inspected owned
+resources. Automatic cleanup refused the resulting unrecorded stopped fixture.
+Manual review verified its unique test image, full trusted launch policy, name
+and non-running state before removal; cleanup then verified complete. The failed
+receipt is retained. No ownership checks or timeouts were weakened. This exposes
+[HARNESS-03](../../plans/tech-debt.md); an idle-host managed rerun remains pending.
+The updated-source bundled rerun passed with seven decoded clips and complete
+verified cleanup. No GPU or unrelated workload was touched.
+
 CPU run receipts retain the source base plus dirty-worktree indication and
 individual workload/cleanup evidence privately. Their images used the current
 implementation before the local source checkpoint. No new GPU or paid request
