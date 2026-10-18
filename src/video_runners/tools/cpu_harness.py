@@ -167,6 +167,11 @@ def capture(path: Path, docker: Docker) -> dict:
 def cleanup_manifest(path: Path, docker: Docker):
     manifest = capture(path, docker)
     project = manifest["run_id"]
+    unresolved = manifest.get("unresolved_controller")
+    if unresolved:
+        actual = docker.inspect("container", unresolved)
+        if not actual or not actual["State"]["Running"]:
+            raise RuntimeError("controller mutations unresolved; retain state for review")
     if (path.parent / ".private").is_symlink():
         raise RuntimeError("private input directory changed")
 
@@ -237,9 +242,14 @@ def cleanup_manifest(path: Path, docker: Docker):
                     or any(op.get("state") == "running" for op in operations)
                     or (operations and operations[-1].get("state") != "succeeded")
                 ):
+                    manifest["cleanup"] = "review_required"
+                    manifest["unresolved_controller"] = item["id"]
+                    save_manifest(path, manifest)
                     raise RuntimeError(
                         "controller has unresolved mutations; retain state for review"
                     )
+                manifest.pop("unresolved_controller", None)
+                save_manifest(path, manifest)
             if actual["State"]["Running"]:
                 grace = max(
                     150 if item["role"] == "runner" else 45,

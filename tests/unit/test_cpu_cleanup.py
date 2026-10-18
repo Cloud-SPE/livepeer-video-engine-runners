@@ -420,6 +420,11 @@ def test_cleanup_retains_controller_and_state_for_unresolved_mutations(
     assert not daemon.deleted
     assert daemon.inspect("container", controller["Id"])["State"]["Running"]
     assert daemon.inspect("volume", state["Name"]) == state
+    # Stopping a controller manually does not resolve an unknown daemon result.
+    daemon.objects[("container", controller["Id"])]["State"]["Running"] = False
+    with pytest.raises(RuntimeError, match="unresolved"):
+        cleanup_manifest(path, daemon)
+    assert daemon.inspect("volume", state["Name"]) == state
 
 
 def test_cleanup_recaptures_durably_owned_engines_after_runner_shutdown(tmp_path):
