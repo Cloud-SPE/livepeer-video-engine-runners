@@ -371,3 +371,52 @@ def test_cleanup_preserves_state_when_an_engine_appears_during_teardown(tmp_path
     assert daemon.inspect("container", late_id) == late
     assert (private / "controller.json").is_file()
     assert json.loads(path.read_text()).get("cleanup") != "complete"
+
+
+@pytest.mark.parametrize("outcome", ["running", "failed"])
+def test_cleanup_retains_controller_and_state_for_unresolved_mutations(
+    tmp_path, outcome
+):
+    state = {"Name": RUN + "-state", "Driver": "local", "Labels": {LABEL: RUN}}
+    controller = {
+        "Id": "a" * 64,
+        "Name": f"/{RUN}-controller-1",
+        "Image": "sha256:" + "c" * 64,
+        "State": {"Running": True},
+        "Config": {"Labels": {LABEL: RUN}},
+        "HostConfig": {},
+        "Mounts": [],
+        "NetworkSettings": {"Networks": {}},
+    }
+
+    class StoppableDaemon(Daemon):
+        def call(self, *args):
+            if args[0] == "stop":
+                self.objects[("container", args[-1])]["State"]["Running"] = False
+                return ""
+            if args[0] == "rm":
+                self.deleted.append(args)
+                del self.objects[("container", args[1])]
+                return ""
+            return super().call(*args)
+
+    daemon = StoppableDaemon(
+        {("container", controller["Id"]): controller, ("volume", state["Name"]): state}
+    )
+    daemon.state = {
+        "namespace": RUN,
+        "containers": {},
+        "operations": {"switch": {"model": "first", "state": outcome}},
+    }
+    path = manifest(
+        tmp_path,
+        daemon,
+        [resource("container", controller, "controller"), resource("volume", state)],
+    )
+
+    with pytest.raises(RuntimeError, match="controller.*unresolved"):
+        cleanup_manifest(path, daemon)
+
+    assert not daemon.deleted
+    assert daemon.inspect("container", controller["Id"])["State"]["Running"]
+    assert daemon.inspect("volume", state["Name"]) == state

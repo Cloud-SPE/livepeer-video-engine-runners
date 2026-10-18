@@ -223,6 +223,25 @@ def cleanup_manifest(path: Path, docker: Docker):
     for item in containers:
         actual = verified(item)
         if actual:
+            if item["role"] == "controller" and actual["State"]["Running"]:
+                state = json.loads(
+                    docker.call(
+                        "exec",
+                        item["id"],
+                        "python",
+                        "-c",
+                        "print(open('/state/state.json').read())",
+                    )
+                )
+                operations = list(state.get("operations", {}).values())
+                if (
+                    state["namespace"] != project
+                    or any(op.get("state") == "running" for op in operations)
+                    or (operations and operations[-1].get("state") != "succeeded")
+                ):
+                    raise RuntimeError(
+                        "controller has unresolved mutations; retain state for review"
+                    )
             if actual["State"]["Running"]:
                 grace = max(
                     150 if item["role"] == "runner" else 45,
