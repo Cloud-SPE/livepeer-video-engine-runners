@@ -171,7 +171,9 @@ def cleanup_manifest(path: Path, docker: Docker):
     if unresolved:
         actual = docker.inspect("container", unresolved)
         if not actual or not actual["State"]["Running"]:
-            raise RuntimeError("controller mutations unresolved; retain state for review")
+            raise RuntimeError(
+                "controller mutations unresolved; retain state for review"
+            )
     if (path.parent / ".private").is_symlink():
         raise RuntimeError("private input directory changed")
 
@@ -239,6 +241,8 @@ def cleanup_manifest(path: Path, docker: Docker):
                 operations = list(state.get("operations", {}).values())
                 if (
                     state["namespace"] != project
+                    or state.get("enabled")
+                    or state.get("active") is not None
                     or any(op.get("state") == "running" for op in operations)
                     or (operations and operations[-1].get("state") != "succeeded")
                 ):

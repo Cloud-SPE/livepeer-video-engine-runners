@@ -373,7 +373,7 @@ def test_cleanup_preserves_state_when_an_engine_appears_during_teardown(tmp_path
     assert json.loads(path.read_text()).get("cleanup") != "complete"
 
 
-@pytest.mark.parametrize("outcome", ["running", "failed"])
+@pytest.mark.parametrize("outcome", ["running", "failed", "recovering"])
 def test_cleanup_retains_controller_and_state_for_unresolved_mutations(
     tmp_path, outcome
 ):
@@ -406,7 +406,13 @@ def test_cleanup_retains_controller_and_state_for_unresolved_mutations(
     daemon.state = {
         "namespace": RUN,
         "containers": {},
-        "operations": {"switch": {"model": "first", "state": outcome}},
+        "enabled": outcome == "recovering",
+        "operations": {
+            "switch": {
+                "model": "first",
+                "state": "succeeded" if outcome == "recovering" else outcome,
+            }
+        },
     }
     path = manifest(
         tmp_path,
