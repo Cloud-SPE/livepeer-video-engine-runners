@@ -153,7 +153,11 @@ class Runner:
                 except Exception:
                     log.exception("could not load %s; restoring %s", model_id, previous)
                     if isinstance(self.supervisor, ManagedSupervisor):
-                        restored = await self.supervisor.preferred_model(timeout=5)
+                        # The failed operation becomes visible before the
+                        # controller finishes loading the previous GPU model.
+                        restored = await self.supervisor.preferred_model(
+                            timeout=self.models[previous].startup_timeout_s + 90
+                        )
                         if restored != previous:
                             raise EngineError(
                                 "controller has not restored previous model"

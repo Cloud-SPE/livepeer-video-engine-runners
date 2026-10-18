@@ -338,3 +338,46 @@ def test_admin_switch_requires_a_boolean_force_flag(force):
             assert requested == ([(DEFAULT, force)] if type(force) is bool else [])
 
     asyncio.run(scenario())
+
+
+def test_failed_switch_waits_for_a_realistic_managed_rollback_before_readmission():
+    from video_runners.lifecycle.managed import ManagedSupervisor
+
+    async def scenario():
+        async with aiohttp.ClientSession() as http:
+
+            class RollingBack(ManagedSupervisor):
+                async def start(self, spec, client):
+                    raise EngineError("target startup failed")
+
+                async def preferred_model(self, timeout=1800):
+                    # Model restoration takes six simulated seconds, inside its
+                    # configured startup bound and beyond the old five seconds.
+                    if timeout < 6:
+                        raise EngineError("controller recovery timed out")
+                    return DEFAULT
+
+                async def attach_restored(self, spec, client):
+                    self.spec = spec
+                    client.spec = spec
+                    self.running = True
+
+            supervisor = RollingBack("http://controller:9200", "token", http)
+            supervisor.spec = MODELS[DEFAULT]
+            runner = Runner(argparse.Namespace(), MODELS, http, supervisor=supervisor)
+            runner.client = engine_client(supervisor.spec, http)
+            runner.available = True
+            registrations = []
+
+            async def register(spec):
+                registrations.append(spec.id)
+
+            runner._register = register
+            with pytest.raises(EngineError, match="target startup failed"):
+                await runner.switch("stub-h3")
+
+            assert runner.available and not runner.needs_reset
+            assert runner.spec.id == DEFAULT and registrations == [DEFAULT]
+            assert not runner.switching and not runner.gpu.locked()
+
+    asyncio.run(scenario())
