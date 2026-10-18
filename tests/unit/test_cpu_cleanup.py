@@ -296,3 +296,33 @@ def test_cleanup_refuses_changed_container_mounts(tmp_path, field, changed):
     with pytest.raises(RuntimeError, match="configuration drifted"):
         cleanup_manifest(path, daemon)
     assert daemon.deleted == []
+
+
+def test_cleanup_honors_the_runners_managed_shutdown_grace(tmp_path):
+    runner = {
+        "Id": "a" * 64,
+        "Name": f"/{RUN}-runner-1",
+        "Image": "sha256:" + "c" * 64,
+        "State": {"Running": True},
+        "Config": {"Labels": {LABEL: RUN}, "StopTimeout": 180},
+        "HostConfig": {},
+        "Mounts": [],
+        "NetworkSettings": {"Networks": {}},
+    }
+
+    class StoppableDaemon(Daemon):
+        def call(self, *args):
+            if args[0] == "stop":
+                assert int(args[2]) >= 180, "runner shutdown was cut short"
+                self.objects[("container", args[-1])]["State"]["Running"] = False
+                return ""
+            if args[0] == "rm":
+                self.deleted.append(args)
+                del self.objects[("container", args[1])]
+                return ""
+            return super().call(*args)
+
+    daemon = StoppableDaemon({("container", runner["Id"]): runner})
+    path = manifest(tmp_path, daemon, [resource("container", runner, "runner")])
+    cleanup_manifest(path, daemon)
+    assert not daemon.objects

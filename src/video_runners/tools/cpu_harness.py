@@ -224,7 +224,11 @@ def cleanup_manifest(path: Path, docker: Docker):
         actual = verified(item)
         if actual:
             if actual["State"]["Running"]:
-                docker.call("stop", "-t", "45", item["id"])
+                grace = max(
+                    150 if item["role"] == "runner" else 45,
+                    actual["Config"].get("StopTimeout") or 0,
+                )
+                docker.call("stop", "-t", str(grace), item["id"])
             if verified(item):
                 docker.call("rm", item["id"])
     for kind in ("network", "volume", "image"):
