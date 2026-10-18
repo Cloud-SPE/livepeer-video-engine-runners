@@ -420,3 +420,89 @@ def test_cleanup_retains_controller_and_state_for_unresolved_mutations(
     assert not daemon.deleted
     assert daemon.inspect("container", controller["Id"])["State"]["Running"]
     assert daemon.inspect("volume", state["Name"]) == state
+
+
+def test_cleanup_recaptures_durably_owned_engines_after_runner_shutdown(tmp_path):
+    controller_image, engine_image = "sha256:" + "c" * 64, "sha256:" + "e" * 64
+    raw = {
+        "namespace": RUN,
+        "network": RUN + "-engine",
+        "gpu": None,
+        "allow_local_images": True,
+        "models": {"first": {"image": engine_image, "command": ["engine"]}},
+    }
+    payload = Policy(deepcopy(raw)).payloads["first"]
+
+    def container(identifier, role):
+        return {
+            "Id": identifier * 64,
+            "Name": f"/{RUN}-{role}-1",
+            "Image": controller_image,
+            "State": {"Running": True},
+            "Config": {
+                "Labels": {
+                    LABEL: RUN,
+                    "com.docker.compose.project": RUN,
+                    "com.docker.compose.service": role,
+                }
+            },
+            "HostConfig": {},
+            "Mounts": [],
+            "NetworkSettings": {"Networks": {}},
+        }
+
+    runner, controller = container("a", "runner"), container("b", "controller")
+    engine = container("d", "engine")
+    engine.update(
+        Name=f"/{RUN}-late",
+        Image=engine_image,
+        Config={
+            k: v
+            for k, v in payload.items()
+            if k not in {"HostConfig", "NetworkingConfig"}
+        },
+        HostConfig=payload["HostConfig"],
+        NetworkSettings={"Networks": payload["NetworkingConfig"]["EndpointsConfig"]},
+    )
+
+    class LateOwnedCreation(Daemon):
+        def call(self, *args):
+            if args[0] == "stop":
+                self.objects[("container", args[-1])]["State"]["Running"] = False
+                if args[-1] == runner["Id"]:
+                    self.objects[("container", engine["Id"])] = engine
+                    self.state["containers"][engine["Id"]] = "first"
+                return ""
+            if args[0] == "rm":
+                self.deleted.append(args)
+                del self.objects[("container", args[-1])]
+                return ""
+            return super().call(*args)
+
+    daemon = LateOwnedCreation(
+        {
+            ("container", runner["Id"]): runner,
+            ("container", controller["Id"]): controller,
+            ("image", controller_image): {"Id": controller_image},
+            ("image", engine_image): {"Id": engine_image},
+        }
+    )
+    daemon.state = {"namespace": RUN, "containers": {}, "operations": {}}
+    path = manifest(tmp_path, daemon, [])
+    data = json.loads(path.read_text())
+    data.update(
+        service_images={
+            "controller": controller_image,
+            "runner": controller_image,
+            "engine-image": engine_image,
+        },
+        engine_policy=raw,
+    )
+    atomic_json(path, data)
+
+    cleanup_manifest(path, daemon)
+
+    assert json.loads(path.read_text())["cleanup"] == "complete"
+    assert not [key for key in daemon.objects if key[0] == "container"]
+    removed = [args[-1] for args in daemon.deleted]
+    assert removed.index(engine["Id"]) < removed.index(controller["Id"])

@@ -217,12 +217,8 @@ def cleanup_manifest(path: Path, docker: Docker):
     # Validate all recorded identities before the first destructive operation.
     for item in manifest["resources"]:
         validate(item)
-    priority = {"runner": 0, "managed-engine": 1, "controller": 2}
-    containers = sorted(
-        (r for r in manifest["resources"] if r["kind"] == "container"),
-        key=lambda r: priority.get(r["role"], 3),
-    )
-    for item in containers:
+
+    def remove_container(item):
         actual = verified(item)
         if actual:
             if item["role"] == "controller" and actual["State"]["Running"]:
@@ -252,6 +248,25 @@ def cleanup_manifest(path: Path, docker: Docker):
                 docker.call("stop", "-t", str(grace), item["id"])
             if verified(item):
                 docker.call("rm", item["id"])
+
+    # Keep the controller alive while the runner drains and deactivates. Re-read
+    # its durable ownership afterwards: a launch may have completed meanwhile.
+    for item in manifest["resources"]:
+        if item["kind"] == "container" and item["role"] == "runner":
+            remove_container(item)
+    manifest = capture(path, docker)
+    for item in manifest["resources"]:
+        validate(item)
+    containers = sorted(
+        (
+            r
+            for r in manifest["resources"]
+            if r["kind"] == "container" and r["role"] != "runner"
+        ),
+        key=lambda r: {"managed-engine": 0, "controller": 1}.get(r["role"], 2),
+    )
+    for item in containers:
+        remove_container(item)
 
     def require_no_containers():
         if (
