@@ -231,6 +231,18 @@ def cleanup_manifest(path: Path, docker: Docker):
                 docker.call("stop", "-t", str(grace), item["id"])
             if verified(item):
                 docker.call("rm", item["id"])
+
+    def require_no_containers():
+        if (
+            docker.ids("container", LABEL + "=" + project)
+            or docker.ids("container", "com.docker.compose.project=" + project)
+            or docker.ids("container", OWNER + "=" + project)
+        ):
+            raise RuntimeError("unrecorded resources remain; retain state for review")
+
+    # A timed-out daemon mutation may finish during container teardown. Keep
+    # networks, images and durable ownership available until absence is checked.
+    require_no_containers()
     for kind in ("network", "volume", "image"):
         for item in manifest["resources"]:
             if item["kind"] != kind:
@@ -238,6 +250,7 @@ def cleanup_manifest(path: Path, docker: Docker):
             identifier = item["role"] if kind == "image" else item["id"]
             actual = verified(item)
             if actual:
+                require_no_containers()
                 if kind == "volume" and (
                     not identifier.startswith(project + "-")
                     or (actual.get("Labels") or {}).get(LABEL) != project

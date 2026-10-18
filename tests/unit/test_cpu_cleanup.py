@@ -326,3 +326,48 @@ def test_cleanup_honors_the_runners_managed_shutdown_grace(tmp_path):
     path = manifest(tmp_path, daemon, [resource("container", runner, "runner")])
     cleanup_manifest(path, daemon)
     assert not daemon.objects
+
+
+def test_cleanup_preserves_state_when_an_engine_appears_during_teardown(tmp_path):
+    state = {"Name": RUN + "-state", "Driver": "local", "Labels": {LABEL: RUN}}
+    controller = {
+        "Id": "a" * 64,
+        "Name": f"/{RUN}-controller-1",
+        "Image": "sha256:" + "c" * 64,
+        "State": {"Running": False},
+        "Config": {"Labels": {LABEL: RUN}},
+        "HostConfig": {},
+        "Mounts": [],
+        "NetworkSettings": {"Networks": {}},
+    }
+    late_id = "b" * 64
+    late = {"Config": {"Labels": {"io.livepeer.video.owner": RUN}}}
+
+    class LateCreation(Daemon):
+        def call(self, *args):
+            if args[0] == "rm":
+                self.deleted.append(args)
+                del self.objects[("container", args[1])]
+                self.objects[("container", late_id)] = late
+                return ""
+            return super().call(*args)
+
+    daemon = LateCreation(
+        {("container", controller["Id"]): controller, ("volume", state["Name"]): state}
+    )
+    path = manifest(
+        tmp_path,
+        daemon,
+        [resource("container", controller, "controller"), resource("volume", state)],
+    )
+    private = tmp_path / ".private"
+    private.mkdir()
+    (private / "controller.json").write_text("retain recovery configuration")
+
+    with pytest.raises(RuntimeError, match="unrecorded resources remain"):
+        cleanup_manifest(path, daemon)
+
+    assert daemon.inspect("volume", state["Name"]) == state
+    assert daemon.inspect("container", late_id) == late
+    assert (private / "controller.json").is_file()
+    assert json.loads(path.read_text()).get("cleanup") != "complete"
