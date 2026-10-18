@@ -381,3 +381,64 @@ def test_failed_switch_waits_for_a_realistic_managed_rollback_before_readmission
             assert not runner.switching and not runner.gpu.locked()
 
     asyncio.run(scenario())
+
+
+def test_graceful_switch_waits_until_the_sse_response_is_finished(monkeypatch):
+    from aiohttp import web
+    from video_runners.runner import http as routes
+
+    async def scenario():
+        finishing, may_finish = asyncio.Event(), asyncio.Event()
+        starts = []
+
+        class GatedResponse(web.StreamResponse):
+            async def write_eof(self, data=b""):
+                finishing.set()
+                await may_finish.wait()
+                await super().write_eof(data)
+
+        class Client:
+            idle_known = True
+
+            async def run(self, job):
+                yield b"video"
+
+        class Supervisor(EngineSupervisor):
+            async def start(self, spec, client):
+                starts.append(spec.id)
+                self.spec = spec
+
+        monkeypatch.setattr(routes.web, "StreamResponse", GatedResponse)
+        async with aiohttp.ClientSession() as http:
+            supervisor = Supervisor()
+            supervisor.spec = MODELS[DEFAULT]
+            runner = Runner(
+                argparse.Namespace(busy="reject"), MODELS, http, supervisor=supervisor
+            )
+            runner.client, runner.available = Client(), True
+
+            async def register(_):
+                pass
+
+            runner._register = register
+            async with TestServer(app.create_public_app(runner)) as public:
+                response = await http.post(
+                    public.make_url("/generate"), json={"prompt": "test"}
+                )
+                await asyncio.wait_for(finishing.wait(), 1)
+                changing = asyncio.create_task(runner.switch("stub-h3"))
+                try:
+                    for _ in range(3):
+                        await asyncio.sleep(0)
+                    assert (
+                        not starts
+                    ), "switching must not truncate the final SSE response"
+                finally:
+                    may_finish.set()
+                    await asyncio.wait_for(changing, 1)
+                    payload = await response.text()
+                    response.close()
+                assert "event: done" in payload
+                assert starts == ["stub-h3"]
+
+    asyncio.run(scenario())

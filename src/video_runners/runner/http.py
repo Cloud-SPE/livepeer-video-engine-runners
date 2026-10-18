@@ -65,6 +65,9 @@ async def handle_generate(request: web.Request) -> web.StreamResponse:
             else:
                 await _send_video(resp, item)
         await _sse(resp, "done", {})
+        # Unregistering the old runner cancels the node's proxy request. Finish
+        # its response before releasing the lock a graceful switch is awaiting.
+        await resp.write_eof()
         outcome = "completed"
     except asyncio.CancelledError:
         outcome = "cancelled"
