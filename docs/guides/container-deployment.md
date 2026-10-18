@@ -345,7 +345,10 @@ If volume data is inaccessible to the host process, run the CPU model-tools asse
 check above rather than interpreting unreadable files as prepared. GPU UUID
 presence does not establish container GPU access, available VRAM or lease
 ownership. Toolkit operation, engine readiness, discovery, payment capability
-and generation still require their separate validation tiers.
+and generation still require their separate validation tiers. Custom node
+configuration/secret mount permissions are checked by actual node startup, not
+this provider-preparation check; keep those files readable by the configured
+container UID without making secrets public.
 
 ## Generate, inspect, and switch
 

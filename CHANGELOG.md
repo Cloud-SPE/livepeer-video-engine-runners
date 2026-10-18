@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Free GPU readiness evidence for saved-asset preflight, both SDK delivery modes,
+  cached startup and owned-engine recovery/switching/shutdown across the defaults;
+  14 decoded clips and verified cleanup. The intermittent vLLM timeout remains
+  open, and public/paid acceptance is deferred.
 - Read-only asset and managed-deployment checks in the existing preparation tools,
   plus an offline comparison of advertised hourly prices, node ticket parameters
   and signer ceilings using exact arithmetic. Document the checked vLLM warmup

@@ -63,6 +63,13 @@ All three defaults passed both SDK modes on hardware. Active-work drain, the rea
 120-second refusal, force, rollback and shutdown cases passed on one GPU. Its
 payment section tracks the separate paid checks and settlement evidence.
 
+The separate [free GPU readiness follow-up](reports/gpu-readiness-2026-10-18.md)
+checks the new preflight and offline receipt refresh on hardware. All defaults
+passed both SDK modes and engine-loss recovery; controlled vLLM starts, active
+drain/refusal/force/shutdown and 14 decoded clips passed with verified cleanup.
+Cached starts did not reproduce the earlier vLLM timeout; its reliability risk
+remains open. Public/paid acceptance was deferred at the operator's request.
+
 | Area                                             | Status                           | Evidence and scope                                                                                                                                                                                                                                          |
 | ------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SGLang FastWan 1.3B                              | Recorded GPU pass                | Both modes at 512×288, then 832×480 and 121-frame clips; [initial report](reports/gpu-validation-2026-10-15.md), [workload report](reports/operations-validation-2026-10-15.md)                                                                             |

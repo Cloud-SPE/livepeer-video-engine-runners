@@ -48,3 +48,15 @@ delivery modes, bounded sustained operation and final settlement. Review the
 node HTTPS URL, tariff, ticket economics and total test budget first. Preserve
 external data and clean owned resources after the run. CPU checks do not promote
 an untested engine image or establish production readiness.
+
+## Free GPU follow-up
+
+The operator subsequently approved the free GPU window and explicitly deferred
+public/paid acceptance while its endpoint, tariff and budget are unavailable.
+The [hardware report](../../validation/reports/gpu-readiness-2026-10-18.md) records
+the current source and existing engine pins, offline receipt refresh, both SDK
+modes, four controlled vLLM starts, recovery/fresh generation for all three
+defaults, active drain/refusal/force/shutdown and 14 decoded videos. Owned-resource
+cleanup is verified; saved models/caches and unrelated workloads are preserved.
+The cached-start sample did not reproduce the intermittent vLLM timeout and does
+not resolve that risk or validate the upstream candidate.
