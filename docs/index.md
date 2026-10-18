@@ -26,6 +26,7 @@ observed runs; current guides describe how to deploy the checked-in code.
 | Deferred broader provider-platform discussion     | [Full discussion record](plans/deferred/provider-platform-v1.md) |
 | Known gaps and follow-up work                     | [Technical debt](plans/tech-debt.md)                             |
 | Release, metrics and switching implementation     | [Operator release plan](plans/active/operator-release.md)        |
+| Preflight, payment settings and startup follow-up | [Operator readiness](plans/active/operator-readiness.md)         |
 | Quality benchmark and larger-model work           | [Quality execution plan](plans/active/video-quality.md)          |
 | Generate, evaluate and review quality experiments | [Video quality guide](guides/video-quality.md)                   |
 | Engine-container design and rollout history       | [Engine rollout](design/engine-container-rollout.md)             |

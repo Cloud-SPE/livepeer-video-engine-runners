@@ -286,6 +286,67 @@ Substitute your configured model volume name. H3 needs its Diffusers components,
 
 Managed engines run offline and cannot pull images or download missing weights through the controller. Review the trusted [`configs/controller/`](../../configs/controller) catalogs separately from the public request defaults in [`models/`](../../models). SGLang allows 48 GiB host RAM: its text encoder exceeded the original 16 GiB cgroup limit during hardware testing. Host RAM and GPU VRAM are separate limits. Other model limits and offload flags must also be validated on the target host.
 
+## Check preparation before startup
+
+Preparation now records the pinned plan plus a file inventory, including extra
+and locally converted required weights. Check a selected model without importing
+the download client or changing saved assets:
+
+```sh
+docker compose --project-directory . --env-file "$VIDEO_ENV" \
+  -f deploy/compose/assets.yml run --rm model-tools sglang \
+  --model fastwan2.1-t2v-1.3b --check
+```
+
+Use model-tools built from this checkout or a release containing these checks.
+Older receipts without inventories fail with corrective guidance. Repeat the
+ordinary preparation command to reuse cached downloads and record an inventory;
+the check itself never upgrades a receipt or downloads files. It checks plan
+identity, required recorded files and sizes, nonempty weights and the offline
+Hugging Face `main` ref. It rejects paths escaping their asset volume. This is a
+presence/size check, not a full weight checksum or an inference test.
+
+After staging assets and pulling/building the selected service images, inspect
+the managed deployment on its Docker host:
+
+```sh
+python3 src/video_runners/tools/init_deployment.py --check \
+  --env-file "$VIDEO_ENV" --compose-file compose.prod.yml \
+  --model sglang-fastwan2.1-t2v-1.3b \
+  --model lightx2v-wan2.1-t2v-1.3b \
+  --model vllm-omni-wan2.2-ti2v-5b
+```
+
+Use IDs from the actual public and trusted catalogs. Repeat `--model` only for
+profiles this instance will support; unselected optional models need no weights.
+Without `--model`, a nonempty Compose `MODEL` is checked. A blank `MODEL` requires
+explicit IDs because runtime startup may restore a previous controller selection.
+The checked list does not change that selection: set `MODEL` to a checked profile
+for deterministic startup, or review the controller's restored selection separately.
+For individual-engine catalogs omit the combined engine prefix. Custom profiles
+can supply a matching pinned `--assets-manifest`; revisions must be full commit
+hashes and model directories/filenames must stay relative to their asset volumes.
+
+The check resolves Compose privately, validates the trusted policy, token
+agreement, engine network, Docker API, selected GPU UUID, host-RAM limits,
+available service/engine images, external volumes and prepared assets. It emits
+JSON with `ready`, individual checks and corrective hints; failure exits 1.
+It creates no Docker resources and never pulls/builds images or starts engines.
+Captured Compose output, command errors and credential values are not printed.
+
+`.engine-images.env` is included when present. Add `--extra-env-file "$RELEASE_ENV"`
+for published CPU references, or repeat it for other explicit overrides. Repeat
+`--compose-file` in deployment order for supporting recipes; use `compose.dev.yml`
+for managed development. This preparation check deliberately supports managed
+Compose deployments; bundled/external workflows remain unchanged.
+
+The checker needs a local Unix-socket daemon and read access to its volume data.
+If volume data is inaccessible to the host process, run the CPU model-tools asset
+check above rather than interpreting unreadable files as prepared. GPU UUID
+presence does not establish container GPU access, available VRAM or lease
+ownership. Toolkit operation, engine readiness, discovery, payment capability
+and generation still require their separate validation tiers.
+
 ## Generate, inspect, and switch
 
 For the local demo node, use its configured `ORCHESTRATOR_PORT` (default 8935):

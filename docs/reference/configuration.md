@@ -204,6 +204,16 @@ Source: [tools/init_deployment.py](../../src/video_runners/tools/init_deployment
 | `--project`               | —                                                    | `'video-engines'` | —                    |
 | `--existing-orchestrator` | —                                                    | `False`           | `store_true`         |
 | `--env-file`              | —                                                    | `Path('.env')`    | —                    |
+| `--check`                 | —                                                    | `False`           | `store_true`         |
+| `--compose-file`          | —                                                    | `[]`              | `append`             |
+| `--extra-env-file`        | —                                                    | `[]`              | `append`             |
+| `--model`                 | —                                                    | `[]`              | `append`             |
+| `--assets-manifest`       | —                                                    | `None`            | —                    |
+| `--check-payments`        | —                                                    | `False`           | `store_true`         |
+| `--node-config`           | —                                                    | `None`            | —                    |
+| `--signer-config`         | —                                                    | `None`            | —                    |
+| `--public-catalog`        | —                                                    | `None`            | —                    |
+| `--batch-tickets`         | —                                                    | `None`            | —                    |
 | `--gpu`                   | —                                                    | `''`              | —                    |
 
 ### python3 src/video_runners/tools/prepare_engines.py
@@ -226,6 +236,7 @@ Source: [tools/prepare_weights.py](../../src/video_runners/tools/prepare_weights
 | `--models-dir` | —                                     | `Path('/models')`                | —                    |
 | `--manifest`   | —                                     | `Path('/app/model-assets.json')` | —                    |
 | `--plan`       | —                                     | `False`                          | `store_true`         |
+| `--check`      | —                                     | `False`                          | `store_true`         |
 
 ### python3 src/video_runners/tools/release.py
 

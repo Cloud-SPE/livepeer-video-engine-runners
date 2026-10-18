@@ -91,6 +91,59 @@ These model IDs require the combined `all` catalog. `src/video_runners/tools/val
 
 If the orchestrator is remote and private, an SSH forward can expose its loopback-only client port locally. The reusable [`tunnel service template`](../../deploy/templates/livepeer-video-tunnel.service) forwards orchestrator and admin ports using a private `~/.config/livepeer-video/tunnel.env` containing `ORCHESTRATOR_SSH_HOST`, `LOCAL_ORCHESTRATOR_PORT`, `REMOTE_ORCHESTRATOR_PORT`, `LOCAL_ADMIN_PORT` and `REMOTE_ADMIN_PORT`. It is an optional template, not an installed service. For example, forward ports 8935 and 8990 and configure `ServiceURL`/signer discovery accordingly.
 
+## Review payment settings offline
+
+Advertised rates, ticket parameters and signer ceilings control different things:
+
+| Setting                             | Meaning                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Public `price_usd_per_hour`         | Rate advertised for the selected model; persistent reservations include idle time until released |
+| Node `TicketFaceValue`              | Wei transferred if that ticket wins; distinct from expected value                                |
+| Node `TicketWinProb`                | Encoded win probability; the pinned node requires `0 < value < 2^256 - 1`                        |
+| Signer `MaxTicketEV` / `MaxBatchEV` | Expected-value limits for each ticket and requested batch, in wei                                |
+| Signer `MaxHourlyPrice`             | USD rate ceiling for this hourly-priced runner                                                   |
+| Signer `DepositMultiplier`          | Face-value constraint relative to available deposit; actual collateral requires chain inspection |
+| Operator test budget                | Separate cumulative spending decision; these ceilings do not enforce a total budget              |
+
+The protocol's ticket expected value is the exact rational
+`face_value × win_prob / (2^256 - 1)`. Batch expected value multiplies that by the
+ticket count. Larger face values and lower win probabilities can preserve the
+same expected value while changing redemption frequency, variance and collateral
+requirements. Choose production parameters with those tradeoffs in mind. The
+[acceptance test](../validation/reports/operator-acceptance-2026-10-18.md#paid-delivery-and-settlement)
+proved settlement with deliberately small tickets; its high measured fee fraction
+does not establish suitable production economics.
+
+Compare explicit private node/signer TOML with the operator's priced catalog:
+
+```sh
+python3 src/video_runners/tools/init_deployment.py --check-payments \
+  --node-config /absolute/private/orchestrator.toml \
+  --signer-config /absolute/private/signer.toml \
+  --public-catalog /absolute/private/priced-models.json \
+  --model sglang-fastwan2.1-t2v-1.3b \
+  --model lightx2v-wan2.1-t2v-1.3b \
+  --model vllm-omni-wan2.2-ti2v-5b \
+  --batch-tickets 3
+```
+
+Repeat model IDs only for the intended offerings. `--batch-tickets` is an optional
+proposed count for calculation, not a setting that changes SDK batch negotiation.
+The result reports exact EV, batch capacity and selected rates. Monetary numbers
+use decimal/rational arithmetic; invalid, non-finite, nonpositive or out-of-range
+values fail. Networks/chain IDs and signer ceilings must agree. Mainnet chain ID
+42161 is inferred only for `arbitrum-one-mainnet`; other networks require explicit
+matching IDs in both files. This is a deliberately narrow payment-policy check,
+not the node's complete configuration validator.
+
+This mode needs no Docker, GPU, RPC or wallet access. It reads only the three
+supplied configuration/catalog files, emits allowlisted monetary results and
+generic diagnostics, and submits no payment. It compares the values in those
+files; CLI/environment overrides are not merged. No production rate, cumulative
+budget or ticket settings are chosen automatically. Account funding, oracle
+freshness, actual SDK batch requests, redemption fees and settlement remain
+separate live acceptance checks.
+
 ## Payment acceptance and settlement
 
 Test both delivery modes for each selected model with `--signer`; a free-node

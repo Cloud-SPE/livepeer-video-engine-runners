@@ -101,6 +101,10 @@ are recorded separately above.
 
 ## Pending validation
 
+The [operator readiness follow-up](reports/operator-readiness-2026-10-18.md)
+adds CPU preparation/payment-policy checks and an immutable upstream timeout
+comparison. It changes no engine pins and adds no GPU or paid-readiness claim.
+
 - Production pricing/ticket economics, public node HTTPS and sustained public operation.
 - MiniMax-H3, full-precision vLLM Wan A14B and the optional non-distilled SGLang model on hardware. LightWan NVFP4 has separate pilot evidence.
 - Held-out quality confirmation, whole-clip human review of the longer examples,

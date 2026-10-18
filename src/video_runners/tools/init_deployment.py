@@ -65,10 +65,88 @@ def main() -> None:
         help="Create settings for an existing Livepeer node; edit URLs and its shared secret before starting",
     )
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument(
+        "--check",
+        action="store_true",
+        help="Inspect a prepared managed deployment without creating resources",
+    )
+    parser.add_argument("--compose-file", action="append", type=Path, default=[])
+    parser.add_argument("--extra-env-file", action="append", type=Path, default=[])
+    parser.add_argument(
+        "--model",
+        action="append",
+        default=[],
+        help="Model IDs to check; repeat for several prepared profiles",
+    )
+    parser.add_argument("--assets-manifest", type=Path)
+    operation.add_argument(
+        "--check-payments",
+        action="store_true",
+        help="Compare explicit node/signer payment settings and public rates offline",
+    )
+    parser.add_argument("--node-config", type=Path)
+    parser.add_argument("--signer-config", type=Path)
+    parser.add_argument("--public-catalog", type=Path)
+    parser.add_argument(
+        "--batch-tickets",
+        type=int,
+        help="Optional proposed batch count to compare with MaxBatchEV",
+    )
     parser.add_argument(
         "--gpu", default="", help="Reserved NVIDIA GPU UUID; auto-detects a single GPU"
     )
     args = parser.parse_args()
+    if args.check_payments:
+        from video_runners.tools.payment_check import check_payment_files
+
+        if not args.node_config or not args.signer_config or not args.model:
+            parser.error(
+                "--check-payments requires --node-config, --signer-config and explicit --model IDs"
+            )
+        catalog = (
+            args.public_catalog
+            or Path(__file__).resolve().parents[3] / f"models/{args.engine}.json"
+        )
+        result = check_payment_files(
+            args.node_config,
+            args.signer_config,
+            catalog,
+            args.model,
+            args.batch_tickets,
+        )
+        print(json.dumps(result, indent=2))
+        if not result["ready"]:
+            parser.exit(
+                1, "Offline payment settings checks failed; no payment was submitted.\n"
+            )
+        return
+    if (
+        args.node_config
+        or args.signer_config
+        or args.public_catalog
+        or args.batch_tickets is not None
+    ):
+        parser.error("payment inspection options require --check-payments")
+    if args.check:
+        from video_runners.tools.deployment_check import check_configuration
+
+        result = check_configuration(
+            args.env_file,
+            args.compose_file,
+            args.extra_env_file,
+            args.model,
+            args.assets_manifest,
+        )
+        print(json.dumps(result, indent=2))
+        if not result["ready"]:
+            parser.exit(
+                1,
+                "Deployment preparation checks failed; follow the reported guidance.\n",
+            )
+        return
+    if args.compose_file or args.extra_env_file or args.model or args.assets_manifest:
+        parser.error("Compose/model inspection options require --check")
     if args.env_file.exists():
         parser.error(
             f"{args.env_file} already exists; preserve and edit it instead of overwriting"

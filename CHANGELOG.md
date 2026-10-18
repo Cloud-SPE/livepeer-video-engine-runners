@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Read-only asset and managed-deployment checks in the existing preparation tools,
+  plus an offline comparison of advertised hourly prices, node ticket parameters
+  and signer ceilings using exact arithmetic. Document the checked vLLM warmup
+  timeout candidate without changing engine pins or claiming hardware readiness.
 - Registry-independent CPU image publication and digest-only deployment manifests
   for runner, controller, model-tools and pinned node; manual hosted CI and image
   overrides in existing Compose entry points. Optional reuse applies only to an

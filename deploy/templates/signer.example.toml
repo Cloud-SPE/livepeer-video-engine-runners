@@ -14,6 +14,8 @@ Orchestrators = ["http://192.0.2.10:8935"]
 DiscoveryGrants = ["192.0.2.10:8935"]
 
 # Example test rate ceilings in USD; these are not total spending budgets.
+# Compare these with the node's ticket parameters and the priced catalog using
+# init_deployment.py --check-payments before a separate live acceptance run.
 MaxHourlyPrice = "2"
 MaxFixedPrice = "1"
 ETHUSDMaxAge = "2h"
