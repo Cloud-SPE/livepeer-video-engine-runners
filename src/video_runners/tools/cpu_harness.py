@@ -177,9 +177,7 @@ def cleanup_manifest(path: Path, docker: Docker):
             raise RuntimeError("recorded resource identity/configuration drifted")
         return actual
 
-    # Check every identity before the first destructive operation. Full Config
-    # fingerprints include env values as hashes, never as receipt plaintext.
-    for item in manifest["resources"]:
+    def validate(item):
         identifier = item["role"] if item["kind"] == "image" else item["id"]
         actual = verified(item)
         if actual:
@@ -215,6 +213,10 @@ def cleanup_manifest(path: Path, docker: Docker):
                 or not identifier.startswith("livepeer-video-test-" + project + ":")
             ):
                 raise RuntimeError("refusing foreign image")
+
+    # Validate all recorded identities before the first destructive operation.
+    for item in manifest["resources"]:
+        validate(item)
     priority = {"runner": 0, "managed-engine": 1, "controller": 2}
     containers = sorted(
         (r for r in manifest["resources"] if r["kind"] == "container"),
