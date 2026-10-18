@@ -91,8 +91,42 @@ These model IDs require the combined `all` catalog. `src/video_runners/tools/val
 
 If the orchestrator is remote and private, an SSH forward can expose its loopback-only client port locally. The reusable [`tunnel service template`](../../deploy/templates/livepeer-video-tunnel.service) forwards orchestrator and admin ports using a private `~/.config/livepeer-video/tunnel.env` containing `ORCHESTRATOR_SSH_HOST`, `LOCAL_ORCHESTRATOR_PORT`, `REMOTE_ORCHESTRATOR_PORT`, `LOCAL_ADMIN_PORT` and `REMOTE_ADMIN_PORT`. It is an optional template, not an installed service. For example, forward ports 8935 and 8990 and configure `ServiceURL`/signer discovery accordingly.
 
+## Payment acceptance and settlement
+
+Test both delivery modes for each selected model with `--signer`; a free-node
+pass does not validate payments. Confirm that positive advertised pricing causes
+payment challenges, that the SDK obtains signed payments, and that every returned
+MP4 decodes completely. HTTP counts are neither ticket counts nor final charges.
+Use test rates separately from the production tariff.
+
+The pinned node stores winning tickets durably and redeems them after their
+parameter acceptance window ends. A mined transaction still requires canonical
+finalized confirmation. With the actual container and database path from your
+node configuration, inspect recorded redemption attempts:
+
+```sh
+docker exec "$ORCHESTRATOR_CONTAINER" livepeer orchestrator redemptions \
+  --config "" --redeemer-db "$REDEEMER_DB"
+```
+
+This command reports attempt hashes/phases/errors. An empty array does not prove
+there are no queued winning tickets. Inspect the recipient database's
+`winning_tickets` table read-only and count rows with `redeemed_at IS NULL` before
+removing temporary payment state. Never publish signatures, randomness or raw
+signed transactions from that database. Do not add retry/submission flags merely
+to make a pending result complete.
+
+For settlement evidence, record the successful transaction receipt, verify its
+block hash still matches the canonical block, and verify its block number is at
+or below the RPC's `finalized` head. Confirm the node has marked the corresponding
+tickets redeemed. Chain finality can lag delivery substantially; a successful
+video, signed batch or pending/submitted transaction proves a different step.
+You can stop the GPU runner after delivery while keeping the CPU node and its
+durable state available for redemption. Check pending liabilities before stopping
+that node or removing its state.
+
 ## Validation status and cleanup
 
-Free node orchestration, all three default GPU models and selected recovery cases have been tested. Signer Compose configuration and CLI options are checked against the pinned node source/image. **Paid single-shot SSE generation passed for all three default engines through a local node signer and direct private LAN HTTP on October 16.** See the [node paid verification report](../validation/reports/node-paid-validation-2026-10-16.md). Paid persistent delivery, redemption and settlement remain unvalidated. The [historical paid report](../validation/reports/paid-validation-2026-10-15.md) used legacy go-livepeer and does not prove that replacement path.
+Free node orchestration, all three default GPU models and selected recovery cases have been tested. Signer Compose configuration and CLI options are checked against the pinned node source/image. **Paid single-shot SSE and two-clip persistent delivery passed for all three default engines through a local node signer and direct private LAN HTTP on October 18.** See the [acceptance report](../validation/reports/operator-acceptance-2026-10-18.md#paid-delivery-and-settlement) for payment evidence and its separate settlement status. The [October 16 report](../validation/reports/node-paid-validation-2026-10-16.md) records earlier paid SSE checks. The [historical paid report](../validation/reports/paid-validation-2026-10-15.md) used legacy go-livepeer and does not prove that replacement path.
 
 Dated reports record completed tests and their cleanup; they do not identify a currently running service. For a new run, stop the provider using the documented [shutdown sequence](container-deployment.md#stop-restart-and-update), then stop any test-only node and signer projects with their original Compose/env selections. Preserve existing wallets, keys, model/cache volumes and durable payment/accounting state. Inspect pending redemptions and accounting before deleting any owned temporary state. Remove only verified test resources; never prune a shared daemon.

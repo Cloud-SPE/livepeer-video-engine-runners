@@ -343,7 +343,10 @@ with `SWITCH_DRAIN_TIMEOUT_S` in Compose or `--switch-drain-timeout` on the runn
 CLI (positive and finite). On expiry, HTTP 409 leaves the active job and its
 registration intact and restores admission when the engine state permits it.
 New work is refused while draining. The deadline applies to waiting for active
-work; model startup and rollback retain their own profile timeouts.
+work, including single-shot response completion and the node's acknowledgement
+that delivery has ended; model startup and rollback retain their own profile
+timeouts. Finishing inference alone does not permit unregistering a response
+that the node is still delivering.
 
 To interrupt work explicitly, send the same authenticated request with
 `{"model":"lightx2v-wan2.1-t2v-1.3b","force":true}` using a model ID from your
@@ -357,7 +360,10 @@ including force. Interrupted generations are never automatically resubmitted.
 
 Only one engine is active; switching causes downtime and closes persistent
 sessions after draining or explicit interruption. Failed activation restores
-the last good model when possible. Controller operations use idempotent IDs for
+the last good model when possible. The runner waits for that previous profile's
+startup timeout plus 90 seconds for controller reconciliation before attaching
+and registering the restored engine. This is a bound, not a guaranteed load time.
+Controller operations use idempotent IDs for
 lost-response retries, with a bounded 128-operation history. Runner admin calls
 are synchronous; do not assume the controller's operation ID makes a repeated
 force request safe after an ambiguous response. Inspect status before acting.

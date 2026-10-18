@@ -57,3 +57,28 @@ The [release guide](../../guides/container-releases.md),
 own operating instructions. The [dated report](../../validation/reports/operator-release-2026-10-17.md)
 records 249 CPU tests, 37 Compose configurations, fresh wheel installation,
 16 decoded fixture clips, verified cleanup and CPU-only registry digest/CLI evidence.
+
+## Acceptance follow-up — 2026-10-18
+
+The operator explicitly resumed completion work, including GitHub publication
+and credentials, GPU lifecycle checks and production acceptance. This extends
+the earlier CPU-only implementation scope; quality and longer-duration
+experiments remain paused. Preserve protected keys, wallet/model/cache volumes
+and unrelated workloads; remove owned acceptance deployments afterwards.
+
+- [x] Reproduce cleanup shutdown/late-arrival failures and add regression coverage.
+- [x] Honor runner stop grace, recapture durable ownership and retain unresolved state.
+- [x] Pass full CPU and Compose checks and an actual managed Docker run.
+- [x] Push cleanup changes and configure private GitHub registry settings.
+- [x] Run the hosted four-role CPU release and normal GitHub CI successfully.
+- [x] Verify all three default engines through SDK delivery on the reserved GPU.
+- [x] Record real active-job drain, timeout, force, rollback and shutdown outcomes.
+- [x] Verify replacement-node paid single-shot and two-clip persistent delivery for all three defaults.
+- [x] Verify canonical finalized winning-ticket settlement: 12 confirmed redemptions, zero unsettled tickets.
+- [ ] Confirm production HTTPS/pricing and a bounded sustained-operation check.
+- [x] Recheck the canceled engine tag is absent; resume no engine publication.
+- [ ] Inspect optional registry housekeeping with verified server-administrator access.
+- [x] Clean owned deployments and synchronize the final evidence/debt matrix.
+
+The [acceptance report](../../validation/reports/operator-acceptance-2026-10-18.md)
+records observed results and separates completed checks from external inputs.

@@ -80,6 +80,17 @@ containers, networks, temporary volumes and image tags. Managed engines must als
 match the controller's durable ownership record and generated trusted policy.
 Labels alone do not authorize engine cleanup.
 
+Teardown gives the runner at least 150 seconds to stop, honoring a longer
+configured container grace. It then recaptures engine ownership while the
+controller is still available. Successful deactivation must also leave recovery
+disabled and no active model in durable controller state. Pending operations or an unsuccessful latest
+operation retain the controller and state for review; the manifest remembers
+that uncertainty across cleanup attempts. Manually stopping the controller does
+not resolve an unknown Docker result. After container teardown, cleanup checks
+for late arrivals before removing networks, temporary state or images and
+repeats that check before each removal. Late unknown engines are never adopted
+from labels.
+
 On successful teardown, `cleanup: complete` is retained and private env/catalog/
 overlay files are removed. Evidence remains. If ownership, configuration, image
 tags or the daemon differ, cleanup fails for operator review; it never prunes the
