@@ -489,3 +489,32 @@ def test_graceful_switch_waits_for_the_nodes_single_shot_delivery_release():
             assert closed == [True] and starts == ["stub-h3"]
 
     asyncio.run(scenario())
+
+
+def test_delivery_drain_timeout_preserves_registration_and_readmission():
+    async def scenario():
+        class Registration:
+            active_session_ids = ("still-delivering",)
+
+            async def close(self):
+                raise AssertionError("registration must remain intact")
+
+        async with aiohttp.ClientSession() as http:
+            supervisor = EngineSupervisor()
+            supervisor.spec = MODELS[DEFAULT]
+            runner = Runner(
+                argparse.Namespace(switch_drain_timeout=0.01),
+                MODELS,
+                http,
+                supervisor=supervisor,
+            )
+            registration = Registration()
+            runner.registrations["single-shot"] = registration
+            runner.available = True
+            with pytest.raises(Busy, match="drain timed out"):
+                await asyncio.wait_for(runner.switch("stub-h3"), 1)
+            assert runner.available and not runner.switching and not runner.gpu.locked()
+            assert runner.registrations["single-shot"] is registration
+            assert runner.spec.id == DEFAULT and not runner.needs_reset
+
+    asyncio.run(scenario())
