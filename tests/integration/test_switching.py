@@ -442,3 +442,50 @@ def test_graceful_switch_waits_until_the_sse_response_is_finished(monkeypatch):
                 assert starts == ["stub-h3"]
 
     asyncio.run(scenario())
+
+
+def test_graceful_switch_waits_for_the_nodes_single_shot_delivery_release():
+    async def scenario():
+        starts, closed = [], []
+
+        class Registration:
+            active_session_ids = ("delivering-response",)
+
+            async def close(self):
+                closed.append(True)
+
+        class Supervisor(EngineSupervisor):
+            async def start(self, spec, client):
+                starts.append(spec.id)
+                self.spec = spec
+
+        async with aiohttp.ClientSession() as http:
+            supervisor = Supervisor()
+            supervisor.spec = MODELS[DEFAULT]
+            runner = Runner(
+                argparse.Namespace(switch_drain_timeout=1),
+                MODELS,
+                http,
+                supervisor=supervisor,
+            )
+            registration = Registration()
+            runner.registrations["single-shot"] = registration
+            runner.available = True
+
+            async def register(_):
+                pass
+
+            runner._register = register
+            changing = asyncio.create_task(runner.switch("stub-h3"))
+            try:
+                for _ in range(3):
+                    await asyncio.sleep(0)
+                assert (
+                    not closed and not starts
+                ), "GPU idle does not establish client delivery completion"
+            finally:
+                registration.active_session_ids = ()
+                await asyncio.wait_for(changing, 1)
+            assert closed == [True] and starts == ["stub-h3"]
+
+    asyncio.run(scenario())

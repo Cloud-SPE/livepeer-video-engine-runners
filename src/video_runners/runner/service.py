@@ -138,8 +138,19 @@ class Runner:
                             getattr(self.args, "switch_drain_timeout", 120.0)
                         ):
                             await self.gpu.acquire()
+                            acquired = True
+                            registration = self.registrations.get("single-shot")
+                            # Node forwarding can still be flushing after the
+                            # engine/runner response ends. Its O2R release marks
+                            # that delivery finished; unregistering earlier
+                            # cancels the client's final response bytes.
+                            while registration and registration.active_session_ids:
+                                await asyncio.sleep(0.05)
                     except TimeoutError as exc:
                         outcome = "drain_timeout"
+                        self.available = (
+                            was_available and not self.needs_reset and not self.closing
+                        )
                         raise Busy(
                             "model switch drain timed out; active job was left running"
                         ) from exc
