@@ -52,6 +52,28 @@ Advanced bundled mode uses `livepeer-video-engine-runners-<engine>:local` and
 deliberately includes the runner and engine together. It is a separate recipe
 from the default managed stacks.
 
+### vLLM-Omni output wait
+
+The managed vLLM profiles and bundled Dockerfile use the pinned upstream
+v0.30.0 image and `VLLM_OMNI_ASYNC_OUTPUT_TIMEOUT=600`. This bounds the engine's
+internal wait for an output, including GPU work queued before output transfer.
+The older pinned image hardcoded 30 seconds and ignored this environment setting.
+Increasing the runner/controller startup timeout alone could not correct it.
+
+This internal wait is separate from the profile's startup/job limits and the
+runner's 120-second active-work drain policy. Keep the trusted profile setting
+when adapting a launch. For an external engine, its operator must select a
+compatible image and set the environment in that engine's deployment. A custom
+bundled base also needs its own compatibility check. The standard-library
+[image probe](../reference/checks.md#prepared-vllm-image-wait-policy) checks the
+prepared image without GPU inference; hardware acceptance remains separate.
+
+To update an existing managed deployment, stage just the upstream vLLM image
+with `python3 src/video_runners/tools/prepare_engines.py vllm-omni`, then follow
+[stop, restart and update](#stop-restart-and-update) to apply the updated trusted
+catalog. Retain the deployment's env, controller state and external volumes;
+existing prepared model weights need no new download.
+
 ## Complete development stack
 
 ```sh

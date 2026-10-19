@@ -384,12 +384,12 @@ docker build -f deploy/docker/sglang.Dockerfile -t livepeer-video-engine-runners
 ENGINE=sglang docker compose --project-directory . -f deploy/compose/bundled.yml -f deploy/compose/gpu.yml build
 ```
 
-| Image                                | Base (build arg)                                                     | Pin before production                 |
-| ------------------------------------ | -------------------------------------------------------------------- | ------------------------------------- |
-| `deploy/docker/stub.Dockerfile`      | `python:3.12-slim`                                                   | —                                     |
-| `deploy/docker/sglang.Dockerfile`    | `SGLANG_IMAGE=lmsysorg/sglang:latest`                                | **Yes** — use a release tag or digest |
-| `deploy/docker/vllm-omni.Dockerfile` | `VLLM_OMNI_IMAGE=vllm/vllm-omni:v0.26.0`                             | Pin and validate for bundled use      |
-| `deploy/docker/lightx2v.Dockerfile`  | `LIGHTX2V_IMAGE=lightx2v/lightx2v:26011201-cu128`, `LIGHTX2V_COMMIT` | Pin a compatible base and validate    |
+| Image                                | Base (build arg)                                                     | Pin before production                   |
+| ------------------------------------ | -------------------------------------------------------------------- | --------------------------------------- |
+| `deploy/docker/stub.Dockerfile`      | `python:3.12-slim`                                                   | —                                       |
+| `deploy/docker/sglang.Dockerfile`    | `SGLANG_IMAGE=lmsysorg/sglang:latest`                                | **Yes** — use a release tag or digest   |
+| `deploy/docker/vllm-omni.Dockerfile` | `VLLM_OMNI_IMAGE=vllm/vllm-omni@sha256:…` (v0.30.0)                  | Pinned base; validate the bundled build |
+| `deploy/docker/lightx2v.Dockerfile`  | `LIGHTX2V_IMAGE=lightx2v/lightx2v:26011201-cu128`, `LIGHTX2V_COMMIT` | Pin a compatible base and validate      |
 
 The orchestrator and signer image is built by Compose from the pinned upstream node's own `docker/Dockerfile` at `LIVEPEER_NODE_SOURCE`. The [image-name table](docs/guides/container-deployment.md#image-names-and-roles) lists all managed, development and preparation images. To try another livepeer-node commit, set `LIVEPEER_NODE_SOURCE=https://github.com/livepeer/node.git#<commit>` or a local checkout path.
 

@@ -1,7 +1,7 @@
 # Validation matrix
 
 This is an evidence index, not a claim that a deployment is running. Dated GPU
-reports describe the October 15–18, 2026 runs. Earlier deployment-trial videos and
+reports describe the October 15–19, 2026 runs. Earlier deployment-trial videos and
 raw receipts were removed at the operator's request; quality-pilot clips remain
 private for review. Measurements and hashes remain in the reports. Public
 summaries omit operator hostnames, actual addresses, account identities, private
@@ -67,14 +67,17 @@ The separate [free GPU readiness follow-up](reports/gpu-readiness-2026-10-18.md)
 checks the new preflight and offline receipt refresh on hardware. All defaults
 passed both SDK modes and engine-loss recovery; controlled vLLM starts, active
 drain/refusal/force/shutdown and 14 decoded clips passed with verified cleanup.
-Cached starts did not reproduce the earlier vLLM timeout; its reliability risk
-remains open. Public/paid acceptance was deferred at the operator's request.
+Cached starts did not reproduce the earlier vLLM timeout. Public/paid acceptance
+was deferred at the operator's request. The separate
+[vLLM startup correction](reports/vllm-startup-2026-10-19.md) records the later
+upstream pin change and its regression/hardware checks; the earlier cached-start
+sample alone did not establish a fix.
 
 | Area                                             | Status                           | Evidence and scope                                                                                                                                                                                                                                          |
 | ------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SGLang FastWan 1.3B                              | Recorded GPU pass                | Both modes at 512×288, then 832×480 and 121-frame clips; [initial report](reports/gpu-validation-2026-10-15.md), [workload report](reports/operations-validation-2026-10-15.md)                                                                             |
 | LightX2V Wan 1.3B                                | Recorded GPU pass                | Same two-mode workload progression; model-specific steps/frame counts in the reports                                                                                                                                                                        |
-| vLLM-Omni Wan 5B                                 | Recorded GPU pass                | Both modes and longer workloads; later profile uses CPU offload and VAE tiling                                                                                                                                                                              |
+| vLLM-Omni Wan 5B                                 | Recorded GPU pass                | Both modes and longer workloads; CPU offload and VAE tiling retained; [output-wait correction](reports/vllm-startup-2026-10-19.md) records the v0.30.0 pin                                                                                                  |
 | Cross-engine switching                           | Recorded GPU pass                | Combined catalog switches; observed times, not guaranteed deadlines                                                                                                                                                                                         |
 | Selected recovery behavior                       | Recorded GPU pass                | Twelve recorded cases across three engines, each followed by fresh generation; [case table](reports/operations-validation-2026-10-15.md#recovery-procedure)                                                                                                 |
 | External model volumes and offline reuse         | Recorded host pass               | Download reuse, offline reload, teardown preservation and shared GPU lease; [storage checks](reports/gpu-validation-2026-10-15.md#storage-and-operational-checks)                                                                                           |
@@ -115,8 +118,8 @@ comparison. It changes no engine pins and adds no GPU or paid-readiness claim.
 - Production pricing/ticket economics, public node HTTPS and sustained public operation.
 - MiniMax-H3, full-precision vLLM Wan A14B and the optional non-distilled SGLang model on hardware. LightWan NVFP4 has separate pilot evidence.
 - Held-out quality confirmation, whole-clip human review of the longer examples,
-  memory-saving 20–30-second continuous generation and vLLM startup-warmup reliability; see the [screening report](reports/video-quality-screening-2026-10-16.md).
-- Host/daemon outages, runner crashes during active inference and every model-load failure point.
+  memory-saving 20–30-second continuous generation; see the [screening report](reports/video-quality-screening-2026-10-16.md).
+- Empty-cache vLLM startup stress, host/daemon outages, runner crashes during active inference and every model-load failure point.
 - Multi-GPU behavior, sustained throughput and exhaustive rollback/deadline guarantees.
   The agreed single-GPU drain/timeout/force/rollback/shutdown cases have recorded
   [acceptance evidence](reports/operator-acceptance-2026-10-18.md#active-work-switching-and-shutdown).

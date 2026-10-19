@@ -31,6 +31,9 @@ observed runs; current guides describe how to deploy the checked-in code.
 | Generate, evaluate and review quality experiments | [Video quality guide](guides/video-quality.md)                   |
 | Engine-container design and rollout history       | [Engine rollout](design/engine-container-rollout.md)             |
 
+The [vLLM startup correction](validation/reports/vllm-startup-2026-10-19.md) records
+the upstream wait fix, pinned image and targeted verification.
+
 Keep operating procedures in their guide, architecture in the architecture map
 and dated evidence in reports linked from the validation matrix. Add new docs to
 this navigation graph. The repository checker rejects broken local links,

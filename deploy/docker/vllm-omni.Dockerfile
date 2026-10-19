@@ -1,9 +1,10 @@
 # Runner + vLLM-Omni (`vllm serve ... --omni`). The image has no default
-# entrypoint of its own; pin the tag you have validated.
-ARG VLLM_OMNI_IMAGE=vllm/vllm-omni:v0.26.0
+# entrypoint of its own. Keep the validated base aligned with engine-images.json.
+ARG VLLM_OMNI_IMAGE=vllm/vllm-omni@sha256:b09c9eab7d2e30817208de92ccb482756d13d4339377d7cc4c4ce9f47bf04174
 FROM ${VLLM_OMNI_IMAGE}
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    VLLM_OMNI_ASYNC_OUTPUT_TIMEOUT=600
 
 # The runner gets its own Python 3.12 environment so its packages never touch
 # the engine's torch stack.

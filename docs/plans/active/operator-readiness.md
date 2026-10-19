@@ -60,3 +60,12 @@ defaults, active drain/refusal/force/shutdown and 14 decoded videos. Owned-resou
 cleanup is verified; saved models/caches and unrelated workloads are preserved.
 The cached-start sample did not reproduce the intermittent vLLM timeout and does
 not resolve that risk or validate the upstream candidate.
+
+## Targeted vLLM correction
+
+On October 19 the operator approved replacing the vLLM pin after the preceding
+free window. The [startup report](../../validation/reports/vllm-startup-2026-10-19.md)
+records the official stable image, the regression probe and separate hardware
+evidence. The fixed internal output wait does not change request defaults,
+models, adapters, ownership modes or the active-work switching policy. This
+follow-up does not authorize paid/public acceptance or resume quality work.

@@ -99,7 +99,7 @@
       "memory": 34359738368
     },
     "vllm-omni-wan2.2-ti2v-5b": {
-      "image": "vllm/vllm-omni@sha256:5cba1538c6f8ee81e8bea6708c24e68d7b2640f466a9fbf2ef15e68f2168b48b",
+      "image": "vllm/vllm-omni@sha256:b09c9eab7d2e30817208de92ccb482756d13d4339377d7cc4c4ce9f47bf04174",
       "command": [
         "vllm",
         "serve",
@@ -119,7 +119,8 @@
         "TORCHINDUCTOR_CACHE_DIR": "/cache/vllm-omni/torchinductor",
         "TRITON_CACHE_DIR": "/cache/vllm-omni/triton",
         "CUDA_CACHE_PATH": "/cache/vllm-omni/cuda",
-        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm"
+        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm",
+        "VLLM_OMNI_ASYNC_OUTPUT_TIMEOUT": "600"
       },
       "mounts": [
         {
@@ -239,7 +240,7 @@
       "memory": 68719476736
     },
     "vllm-omni-wan2.2-t2v-a14b": {
-      "image": "vllm/vllm-omni@sha256:5cba1538c6f8ee81e8bea6708c24e68d7b2640f466a9fbf2ef15e68f2168b48b",
+      "image": "vllm/vllm-omni@sha256:b09c9eab7d2e30817208de92ccb482756d13d4339377d7cc4c4ce9f47bf04174",
       "command": [
         "vllm",
         "serve",
@@ -257,7 +258,8 @@
         "TORCHINDUCTOR_CACHE_DIR": "/cache/vllm-omni/torchinductor",
         "TRITON_CACHE_DIR": "/cache/vllm-omni/triton",
         "CUDA_CACHE_PATH": "/cache/vllm-omni/cuda",
-        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm"
+        "VLLM_CACHE_ROOT": "/cache/vllm-omni/vllm",
+        "VLLM_OMNI_ASYNC_OUTPUT_TIMEOUT": "600"
       },
       "mounts": [
         {

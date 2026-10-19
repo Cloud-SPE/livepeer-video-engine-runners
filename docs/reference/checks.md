@@ -102,6 +102,26 @@ Publication starts no inference, signer or paid request. Before a production
 release, run the relevant CPU integration and recorded hardware/payment acceptance
 checks for changed behavior; a successful image build is insufficient evidence.
 
+## Prepared vLLM image wait policy
+
+After explicitly staging the vLLM image on the selected Docker daemon:
+
+```sh
+python3 tests/e2e/vllm-async-wait.py
+# Or compare another already-prepared reference:
+python3 tests/e2e/vllm-async-wait.py --image vllm/vllm-omni@sha256:REPLACE
+```
+
+The probe uses `--pull=never`, no network, a read-only filesystem and no GPU.
+It extracts the actual image's synchronous warmup wait and timeout resolver,
+sets `VLLM_OMNI_ASYNC_OUTPUT_TIMEOUT=600`, and exercises a modeled Future that
+becomes ready at 31 seconds. It does not sleep for 31 seconds or perform inference.
+The previous image fails with its hardcoded 30-second bound; the fixed image
+passes with 600. Output includes the shipped source hash. An upstream wait-contract
+change requires reviewing the probe, rather than treating a parser failure as
+an engine timeout. It starts one disposable container and removes it on exit;
+this explicit Docker tier is not part of routine fast checks.
+
 ## Actual GPU validation
 
 Follow the [deployment guide](../guides/container-deployment.md#generate-inspect-and-switch)
