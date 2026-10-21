@@ -1,5 +1,5 @@
 # Runner + CPU stub engine: exercises the whole Livepeer path without a GPU.
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Flush stdout/stderr immediately so output isn't block-buffered in `docker logs`.
 ENV PYTHONUNBUFFERED=1
